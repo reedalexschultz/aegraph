@@ -1,0 +1,12 @@
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+# Ignore venv
+.venv/
+
+# Ignore jsx files
+*.jsx
+
+# Ignore .DS_Store
+.DS_Store
