@@ -25,7 +25,7 @@ t = np.linspace(0, 2*np.pi, 50)
 y = np.sin(t)
 
 # Create animated graph
-plot = (AEGraph(width=1920, height=1080, drop_shadow=True, cinematic_effects=True)
+plot = (AEGraph(width = 1280, height = 720, compwidth=1920, compheight=1080, drop_shadow=True, cinematic_effects=True)
         .plot(t, y, color="blue", animate=2.0)
         .scatter(t[::5], y[::5], color="red", radius=8)
         .set_title("Sine Wave")
