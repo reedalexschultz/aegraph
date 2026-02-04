@@ -116,7 +116,21 @@ class AEGraph:
         plot.save("my_graph.jsx")
         plot.render()
     """
-    def __init__(self, width=1920, height=1080, comp_name="AEGraph_Comp", bg_color="white", comp_width=None, comp_height=None, compwidth=None, compheight=None, position=None, show_all_points=False, drop_shadow=False, cinematic_effects=False, wiggle=False, easy_ease=True, ease_speed=00, ease_influence=33, fps=24):
+    def __init__(self,
+                 width=1920,
+                 height=1080,
+                 comp_name="AEGraph_Comp",
+                 bg_color="white", comp_width=None,
+                 comp_height=None, compwidth=None,
+                 compheight=None, position=None,
+                 show_all_points=False, drop_shadow=False,
+                 cinematic_effects=False, wiggle=False,
+                 easy_ease=True,
+                 ease_speed=00,
+                 ease_influence=33,
+                 bg_stroke_width = 0,
+                 bg_stroke_color = [0.15, 0.15, 0.15],
+                 fps=24):
         """
         Initialize a new AEGraph instance.
         Args:
@@ -174,6 +188,8 @@ class AEGraph:
         self.ease_speed = ease_speed  # Easy ease speed percentage
         self.ease_influence = ease_influence  # Easy ease influence percentage
         self.fps = fps  # Frame rate for the After Effects composition
+        self.bg_stroke_color = bg_stroke_color
+        self.bg_stroke_width = bg_stroke_width
 
     def _filter_points(self, x, y):
         """
@@ -205,7 +221,7 @@ class AEGraph:
         
         return filtered_x, filtered_y
 
-    def plot(self, x, y, color="blue", label=None, linewidth=4, animate=1.0, drop_shadow=False, **kwargs):
+    def plot(self, x, y, color="blue", label=None, linewidth=4, animate=1.0, delay = 0.0, drop_shadow=False, **kwargs):
         """
         Add a line plot to the graph.
         x, y: Data points (list, tuple, numpy array, or pandas Series).
@@ -234,13 +250,14 @@ class AEGraph:
             "linewidth": linewidth,
             "animate": animate,
             "drop_shadow": drop_shadow,
+            "delay": delay,
             **kwargs
         })
         if label:
             self.legend.append(label)
         return self
 
-    def scatter(self, x, y, color="red", label=None, radius=8, animate=1.0, drop_shadow=False, bar_anim_times=None, **kwargs):
+    def scatter(self, x, y, color="red", label=None, radius=8, delay = 0.0, animate=1.0, drop_shadow=False, bar_anim_times=None, **kwargs):
         """
         Add a scatter plot to the graph.
         x, y: Data points (list, tuple, numpy array, or pandas Series).
@@ -271,13 +288,14 @@ class AEGraph:
             "animate": animate,
             "drop_shadow": drop_shadow,
             "bar_anim_times": bar_anim_times,
+            "delay": delay,
             **kwargs
         })
         if label:
             self.legend.append(label)
         return self
 
-    def histogram(self, data, bins=10, color="p_blue", label=None, alpha=0.8, animate=1.0, drop_shadow=False, bar_anim_times=None, density=False, **kwargs):
+    def histogram(self, data, bins=10, color="p_blue", label=None, delay = 0.0, alpha=0.8, animate=1.0, drop_shadow=False, bar_anim_times=None, density=False, **kwargs):
         """
         Add a histogram to the graph.
         data: 1D array-like data to bin.
@@ -319,6 +337,7 @@ class AEGraph:
             "drop_shadow": drop_shadow,
             "bar_anim_times": bar_anim_times,
             "density": density,
+            "delay": delay,
             **kwargs
         })
         if label:
@@ -447,6 +466,38 @@ class AEGraph:
     def set_ylabel(self, label: str):
         """Set the y-axis label."""
         self.ylabel = label
+        return self
+
+    def annotate(self, text: str, x: float, y: float, fontsize: int = 12, font: str = "Helvetica", alignment: str = "left"):
+        """
+        Add text annotation at specific coordinates on the graph.
+        
+        Args:
+            text (str): The annotation text to display
+            x (float): X coordinate in data space
+            y (float): Y coordinate in data space
+            fontsize (int): Font size (default: 12)
+            font (str): Font name (default: "Helvetica")
+            alignment (str): Text alignment - "left", "center", or "right" (default: "left")
+        
+        Returns:
+            self: For method chaining
+        """
+        # Validate alignment parameter
+        valid_alignments = ["left", "center", "right"]
+        if alignment.lower() not in valid_alignments:
+            raise ValueError(f"alignment must be one of {valid_alignments}, got '{alignment}'")
+        
+        # Store annotation in elements list for processing during JSX generation
+        self.elements.append({
+            "type": "annotation",
+            "text": text,
+            "x": x,
+            "y": y,
+            "fontsize": fontsize,
+            "font": font,
+            "alignment": alignment.lower()
+        })
         return self
 
     def set_xlim(self, xmin, xmax):
@@ -910,67 +961,12 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
         script.append(f"bgRect.property('ADBE Vector Rect Position').setValue([0, 0]);\n")
         script.append(f"var bgFill = bgContents.addProperty('ADBE Vector Graphic - Fill');\n")
         script.append(f"bgFill.property('ADBE Vector Fill Color').setValue({color_to_js(self.bg_color)});\n")
+        # Add stroke to background rectangle
+        script.append(f"var bgStroke = bgContents.addProperty('ADBE Vector Graphic - Stroke');\n")
+        script.append(f"bgStroke.property('ADBE Vector Stroke Color').setValue({color_to_js(self.bg_stroke_color)});\n")
+        script.append(f"bgStroke.property('ADBE Vector Stroke Width').setValue({self.bg_stroke_width});\n")
         script.append(f"bgLayer.property('Transform').property('Position').setValue([{center_x}, {center_y}]);\n")
         script.append(f"bgLayer.parent = PlotAnchor;\n")
-
-        # Title (relative to graph area)
-        if self.title:
-            script.append(f"var titleLayer = comp.layers.addText(\"{self.title}\");\n")
-            script.append(f"titleLayer.property('Transform').property('Position').setValue([{center_x}, {center_y - self.height/2 + 80}]);\n")
-            script.append(f"titleLayer.parent = PlotAnchor;\n")
-            script.append("var titleProp = titleLayer.property('Source Text');\n")
-            script.append("var titleDoc = titleProp.value;\n")
-            script.append("titleDoc.fontSize = 48;\n")
-            script.append("titleDoc.fillColor = [0, 0, 0];\n")
-            script.append("titleDoc.justification = ParagraphJustification.CENTER_JUSTIFY;\n")
-            script.append("titleProp.setValue(titleDoc);\n")
-            
-            # Add drop shadow to title if specified
-            if self.drop_shadow:
-                script.append(self._generate_drop_shadow_jsx("titleLayer", "Title"))
-
-        # Axis labels (relative to graph area)
-        if self.xlabel:
-            script.append(f"var xlabelLayer = comp.layers.addText(\"{self.xlabel}\");\n")
-            # Position x-label below the x-axis ticks (if any) or below the axis
-            if self.xticks:
-                # If there are ticks, position below the tick labels
-                script.append(f"xlabelLayer.property('Transform').property('Position').setValue([{center_x}, {center_y + self.height/2 + 60}]);\n")
-            else:
-                # If no ticks, position below the axis
-                script.append(f"xlabelLayer.property('Transform').property('Position').setValue([{center_x}, {center_y + self.height/2 + 40}]);\n")
-            script.append(f"xlabelLayer.parent = PlotAnchor;\n")
-            script.append("var xlabelProp = xlabelLayer.property('Source Text');\n")
-            script.append("var xlabelDoc = xlabelProp.value;\n")
-            script.append("xlabelDoc.fontSize = 24;\n")
-            script.append("xlabelDoc.fillColor = [0, 0, 0];\n")
-            script.append("xlabelDoc.justification = ParagraphJustification.CENTER_JUSTIFY;\n")
-            script.append("xlabelProp.setValue(xlabelDoc);\n")
-            
-            # Add drop shadow to x-label if specified
-            if self.drop_shadow:
-                script.append(self._generate_drop_shadow_jsx("xlabelLayer", "XLabel"))
-        if self.ylabel:
-            script.append(f"var ylabelLayer = comp.layers.addText(\"{self.ylabel}\");\n")
-            # Position y-label to the left of the y-axis ticks (if any) or to the left of the axis
-            if self.yticks:
-                # If there are ticks, position to the left of the tick labels
-                script.append(f"ylabelLayer.property('Transform').property('Position').setValue([{center_x - self.width/2 - 60}, {center_y}]);\n")
-            else:
-                # If no ticks, position to the left of the axis
-                script.append(f"ylabelLayer.property('Transform').property('Position').setValue([{center_x - self.width/2 - 20}, {center_y}]);\n")
-            script.append(f"ylabelLayer.parent = PlotAnchor;\n")
-            script.append("ylabelLayer.property('Transform').property('Rotation').setValue(-90);\n")
-            script.append("var ylabelProp = ylabelLayer.property('Source Text');\n")
-            script.append("var ylabelDoc = ylabelProp.value;\n")
-            script.append("ylabelDoc.fontSize = 24;\n")
-            script.append("ylabelDoc.fillColor = [0, 0, 0];\n")
-            script.append("ylabelDoc.justification = ParagraphJustification.CENTER_JUSTIFY;\n")
-            script.append("ylabelProp.setValue(ylabelDoc);\n")
-            
-            # Add drop shadow to y-label if specified
-            if self.drop_shadow:
-                script.append(self._generate_drop_shadow_jsx("ylabelLayer", "YLabel"))
 
         # In _generate_jsx, calculate global data limits with NO padding
         all_x = []
@@ -1026,6 +1022,8 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
                 script.append(f"gridVStroke{grid_var}.property('ADBE Vector Stroke Width').setValue(1);\n")
                 script.append(f"gridVStroke{grid_var}.property('ADBE Vector Stroke Opacity').setValue(0);\n")
                 # Animate opacity in
+                
+                
                 script.append(f"gridVStroke{grid_var}.property('ADBE Vector Stroke Opacity').setValueAtTime(0, 0);\n")
                 script.append(f"gridVStroke{grid_var}.property('ADBE Vector Stroke Opacity').setValueAtTime({ANIM_DURATION * (0.5 + 0.5 * idx / 10)}, {int(self.grid_alpha * 100)});\n")
                 # Apply easy ease to grid V opacity keyframes
@@ -1064,6 +1062,7 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
 
         # Plot elements
         for i, elem in enumerate(self.elements):
+            delay = elem.get("delay", 0.0)
             # Use the same data limits for all mapping
             if elem["type"] == "line":
                 px, py = elem["x"], elem["y"]
@@ -1088,8 +1087,8 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
                 if elem["animate"] and elem["animate"] > 0:
                     script.append(f"var trim{i} = contents{i}.addProperty('ADBE Vector Filter - Trim');\n")
                     script.append(f"var endProp{i} = trim{i}.property('ADBE Vector Trim End');\n")
-                    script.append(f"endProp{i}.setValueAtTime(0, 0);\n")
-                    script.append(f"endProp{i}.setValueAtTime({elem['animate']}, 100);\n")
+                    script.append(f"endProp{i}.setValueAtTime({delay}, 0);\n")
+                    script.append(f"endProp{i}.setValueAtTime({delay + elem['animate']}, 100);\n")
                     # Apply easy ease to trim path keyframes
                     if self.easy_ease:
                         script.append(f"applyEasyEase(endProp{i}, {self.ease_speed}, {self.ease_influence});\n")
@@ -1132,8 +1131,8 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
                         anim_time = bar_anim_times[j]
                         start_time = start_times[j]
                         script.append(f"var scale{i}_{j} = scatterLayer{i}_{j}.property('Transform').property('Scale');\n")
-                        script.append(f"scale{i}_{j}.setValueAtTime({start_time}, [0, 0, 100]);\n")
-                        script.append(f"scale{i}_{j}.setValueAtTime({start_time + anim_time}, [100, 100, 100]);\n")
+                        script.append(f"scale{i}_{j}.setValueAtTime({delay + start_time}, [0, 0, 100]);\n")
+                        script.append(f"scale{i}_{j}.setValueAtTime({delay + start_time + anim_time}, [100, 100, 100]);\n")
                         # Apply easy ease to scale keyframes
                         if self.easy_ease:
                             script.append(f"applyEasyEase(scale{i}_{j}, {self.ease_speed}, {self.ease_influence});\n")
@@ -1200,8 +1199,8 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
                     anim_time = bar_anim_times[j]
                     start_time = start_times[j]
                     script.append(f"var histScale{i}_{j} = histLayer{i}_{j}.property('Transform').property('Scale');\n")
-                    script.append(f"histScale{i}_{j}.setValueAtTime({start_time}, [100, 0, 100]);\n")
-                    script.append(f"histScale{i}_{j}.setValueAtTime({start_time + anim_time}, [100, 100, 100]);\n")
+                    script.append(f"histScale{i}_{j}.setValueAtTime({delay + start_time}, [100, 0, 100]);\n")
+                    script.append(f"histScale{i}_{j}.setValueAtTime({delay + start_time + anim_time}, [100, 100, 100]);\n")
                     if self.easy_ease:
                         script.append(f"applyEasyEase(histScale{i}_{j}, {self.ease_speed}, {self.ease_influence});\n")
                     if elem.get("drop_shadow", False):
@@ -1265,8 +1264,8 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
                     anim_time = bar_anim_times[j]
                     start_time = start_times[j]
                     script.append(f"var barScale{i}_{j} = barLayer{i}_{j}.property('Transform').property('Scale');\n")
-                    script.append(f"barScale{i}_{j}.setValueAtTime({start_time}, [100, 0, 100]);\n")
-                    script.append(f"barScale{i}_{j}.setValueAtTime({start_time + anim_time}, [100, 100, 100]);\n")
+                    script.append(f"barScale{i}_{j}.setValueAtTime({delay + start_time}, [100, 0, 100]);\n")
+                    script.append(f"barScale{i}_{j}.setValueAtTime({delay + start_time + anim_time}, [100, 100, 100]);\n")
                     if self.easy_ease:
                         script.append(f"applyEasyEase(barScale{i}_{j}, {self.ease_speed}, {self.ease_influence});\n")
                     if elem.get("drop_shadow", False):
@@ -1276,26 +1275,6 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
         # Mixed plots get axes on top to accommodate bar/histogram rendering
         if has_bars_or_hist or not has_scatter:
             self._generate_axes_jsx(script, center_x, center_y, xmin_pad, xmax_pad, ymin_pad, ymax_pad, ANIM_DURATION)
-
-        # Animate title and axis labels (only if they exist)
-        if self.title:
-            script.append(f"titleLayer.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
-            script.append(f"titleLayer.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * 1.1}, 100);\n")
-            # Apply easy ease to title opacity keyframes
-            if self.easy_ease:
-                script.append(f"applyEasyEase(titleLayer.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
-        if self.xlabel:
-            script.append(f"xlabelLayer.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
-            script.append(f"xlabelLayer.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * 1.2}, 100);\n")
-            # Apply easy ease to xlabel opacity keyframes
-            if self.easy_ease:
-                script.append(f"applyEasyEase(xlabelLayer.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
-        if self.ylabel:
-            script.append(f"ylabelLayer.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
-            script.append(f"ylabelLayer.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * 1.2}, 100);\n")
-            # Apply easy ease to ylabel opacity keyframes
-            if self.easy_ease:
-                script.append(f"applyEasyEase(ylabelLayer.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
 
         # --- DYNAMIC LEGEND PLACEMENT (relative to graph area) ---
         legend_entries = []
@@ -1385,8 +1364,11 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
 
 
                 # Title (relative to graph area)
+
+                # Title (relative to graph area)
         if self.title:
-            script.append(f"var titleLayer = comp.layers.addText(\"{self.title}\");\n")
+            escaped_title = self.title.replace('"', '\\"').replace('→', '->').replace('←', '<-').replace('↑', '^').replace('↓', 'v')
+            script.append(f"var titleLayer = comp.layers.addText(\"{escaped_title}\");\n")
             script.append(f"titleLayer.property('Transform').property('Position').setValue([{center_x}, {center_y - self.height/2 + 80}]);\n")
             script.append(f"titleLayer.parent = PlotAnchor;\n")
             script.append("var titleProp = titleLayer.property('Source Text');\n")
@@ -1396,13 +1378,20 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
             script.append("titleDoc.justification = ParagraphJustification.CENTER_JUSTIFY;\n")
             script.append("titleProp.setValue(titleDoc);\n")
             
+            # Animate title
+            script.append(f"titleLayer.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
+            script.append(f"titleLayer.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * 1.1}, 100);\n")
+            if self.easy_ease:
+                script.append(f"applyEasyEase(titleLayer.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+            
             # Add drop shadow to title if specified
             if self.drop_shadow:
                 script.append(self._generate_drop_shadow_jsx("titleLayer", "Title"))
 
         # Axis labels (relative to graph area)
         if self.xlabel:
-            script.append(f"var xlabelLayer = comp.layers.addText(\"{self.xlabel}\");\n")
+            escaped_xlabel = self.xlabel.replace('"', '\\"').replace('→', '->').replace('←', '<-').replace('↑', '^').replace('↓', 'v')
+            script.append(f"var xlabelLayer = comp.layers.addText(\"{escaped_xlabel}\");\n")
             # Position x-label below the x-axis ticks (if any) or below the axis
             if self.xticks:
                 # If there are ticks, position below the tick labels
@@ -1418,11 +1407,18 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
             script.append("xlabelDoc.justification = ParagraphJustification.CENTER_JUSTIFY;\n")
             script.append("xlabelProp.setValue(xlabelDoc);\n")
             
+            # Animate xlabel
+            script.append(f"xlabelLayer.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
+            script.append(f"xlabelLayer.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * 1.2}, 100);\n")
+            if self.easy_ease:
+                script.append(f"applyEasyEase(xlabelLayer.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+            
             # Add drop shadow to x-label if specified
             if self.drop_shadow:
                 script.append(self._generate_drop_shadow_jsx("xlabelLayer", "XLabel"))
         if self.ylabel:
-            script.append(f"var ylabelLayer = comp.layers.addText(\"{self.ylabel}\");\n")
+            escaped_ylabel = self.ylabel.replace('"', '\\"').replace('→', '->').replace('←', '<-').replace('↑', '^').replace('↓', 'v')
+            script.append(f"var ylabelLayer = comp.layers.addText(\"{escaped_ylabel}\");\n")
             # Position y-label to the left of the y-axis ticks (if any) or to the left of the axis
             if self.yticks:
                 # If there are ticks, position to the left of the tick labels
@@ -1439,9 +1435,64 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
             script.append("ylabelDoc.justification = ParagraphJustification.CENTER_JUSTIFY;\n")
             script.append("ylabelProp.setValue(ylabelDoc);\n")
             
+            # Animate ylabel
+            script.append(f"ylabelLayer.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
+            script.append(f"ylabelLayer.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * 1.2}, 100);\n")
+            if self.easy_ease:
+                script.append(f"applyEasyEase(ylabelLayer.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+            
             # Add drop shadow to y-label if specified
             if self.drop_shadow:
                 script.append(self._generate_drop_shadow_jsx("ylabelLayer", "YLabel"))
+
+        # --- ANNOTATIONS (generated on top of all other layers) ---
+        annotation_count = 0
+        for i, elem in enumerate(self.elements):
+            if elem["type"] == "annotation":
+                # Convert annotation coordinates from data space to shape coordinates
+                ann_x, ann_y = self._data_to_shape(elem["x"], elem["y"], xmin_pad, xmax_pad, ymin_pad, ymax_pad)
+                ann_pos_x = center_x + ann_x
+                ann_pos_y = center_y + ann_y
+                
+                # Escape special characters in text for JSX safety
+                escaped_text = elem['text'].replace('"', '\\"').replace('→', '->').replace('←', '<-').replace('↑', '^').replace('↓', 'v')
+                
+                # Map alignment to After Effects justification
+                alignment_map = {
+                    "left": "ParagraphJustification.LEFT_JUSTIFY",
+                    "center": "ParagraphJustification.CENTER_JUSTIFY", 
+                    "right": "ParagraphJustification.RIGHT_JUSTIFY"
+                }
+                justification = alignment_map.get(elem.get("alignment", "left"), "ParagraphJustification.LEFT_JUSTIFY")
+                
+                # Create text layer for annotation
+                script.append(f"var annotationLayer{annotation_count} = comp.layers.addText(\"{escaped_text}\");\n")
+                script.append(f"annotationLayer{annotation_count}.name = \"Annotation_{annotation_count}\";\n")
+                script.append(f"annotationLayer{annotation_count}.property('Transform').property('Position').setValue([{ann_pos_x}, {ann_pos_y}]);\n")
+                script.append(f"annotationLayer{annotation_count}.parent = PlotAnchor;\n")
+                
+                # Set text properties
+                script.append(f"var annotationProp{annotation_count} = annotationLayer{annotation_count}.property('Source Text');\n")
+                script.append(f"var annotationDoc{annotation_count} = annotationProp{annotation_count}.value;\n")
+                script.append(f"annotationDoc{annotation_count}.fontSize = {elem['fontsize']};\n")
+                script.append(f"annotationDoc{annotation_count}.font = \"{elem['font']}\";\n")
+                script.append(f"annotationDoc{annotation_count}.fillColor = [0, 0, 0];\n")
+                script.append(f"annotationDoc{annotation_count}.justification = {justification};\n")
+                script.append(f"annotationProp{annotation_count}.setValue(annotationDoc{annotation_count});\n")
+                
+                # Fade-in animation for annotation
+                script.append(f"annotationLayer{annotation_count}.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
+                script.append(f"annotationLayer{annotation_count}.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * 0.9}, 100);\n")
+                
+                # Apply easy ease to annotation opacity keyframes
+                if self.easy_ease:
+                    script.append(f"applyEasyEase(annotationLayer{annotation_count}.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+                
+                # Add drop shadow if globally enabled
+                if self.drop_shadow:
+                    script.append(self._generate_drop_shadow_jsx(f"annotationLayer{annotation_count}", f"Annotation{annotation_count}"))
+                
+                annotation_count += 1
 
         # --- CINEMATIC ADJUSTMENT LAYER (generated last to appear on top) ---
         if self.cinematic_effects:
@@ -1498,11 +1549,11 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
             script.append(f"    turbulent.property(\"Offset (Turbulence)\").setValue([{self.comp_width/2}, {self.comp_height/2}]);     // Center offset\n")
             script.append(f"    turbulent.property(\"Complexity\").setValue(10);     // Complexity\n")
             script.append(f"    turbulent.property(\"Evolution\").setValueAtTime(0, 0);     // Start evolution\n")
-            script.append(f"    turbulent.property(\"Evolution\").setValueAtTime(0.4, -267);     // Keyframe 1\n")
-            script.append(f"    turbulent.property(\"Evolution\").setValueAtTime(0.8, 76);     // Keyframe 2\n")
-            script.append(f"    turbulent.property(\"Evolution\").setValueAtTime(1.2, -143);     // Keyframe 3\n")
-            script.append(f"    turbulent.property(\"Evolution\").setValueAtTime(1.6, -313);     // Keyframe 4\n")
-            script.append(f"    turbulent.property(\"Evolution\").setValueAtTime(2.0, 0);     // End evolution\n")
+            script.append(f"    turbulent.property(\"Evolution\").setValueAtTime(0.2, -267);     // Keyframe 1\n")
+            script.append(f"    turbulent.property(\"Evolution\").setValueAtTime(0.4, 76);     // Keyframe 2\n")
+            script.append(f"    turbulent.property(\"Evolution\").setValueAtTime(0.6, -143);     // Keyframe 3\n")
+            script.append(f"    turbulent.property(\"Evolution\").setValueAtTime(0.8, -313);     // Keyframe 4\n")
+            script.append(f"    turbulent.property(\"Evolution\").setValueAtTime(1.0, 0);     // End evolution\n")
             script.append(f"    // Set all keyframes to hold interpolation\n")
             script.append(f"    turbulent.property(\"Evolution\").setInterpolationTypeAtKey(1, KeyframeInterpolationType.HOLD);\n")
             script.append(f"    turbulent.property(\"Evolution\").setInterpolationTypeAtKey(2, KeyframeInterpolationType.HOLD);\n")
