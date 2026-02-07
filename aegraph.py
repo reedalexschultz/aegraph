@@ -128,6 +128,7 @@ class AEGraph:
                  easy_ease=True,
                  ease_speed=00,
                  ease_influence=33,
+                 animate_opacity=True,
                  bg_stroke_width = 0,
                  bg_stroke_color = [0.15, 0.15, 0.15],
                  fps=24):
@@ -187,6 +188,7 @@ class AEGraph:
         self.easy_ease = easy_ease  # Whether to apply easy ease to all animation keyframes
         self.ease_speed = ease_speed  # Easy ease speed percentage
         self.ease_influence = ease_influence  # Easy ease influence percentage
+        self.animate_opacity = animate_opacity  # Enable/disable opacity fade animations
         self.fps = fps  # Frame rate for the After Effects composition
         self.bg_stroke_color = bg_stroke_color
         self.bg_stroke_width = bg_stroke_width
@@ -404,18 +406,98 @@ class AEGraph:
             self.legend.append(label)
         return self
 
+    def barh(self, y_values, widths, bar_height=None, color="p_blue", label=None, delay=0.0, alpha=0.8, animate=1.0, drop_shadow=False, bar_duration=None, bar_anim_times=None, animate_downward: bool = False, **kwargs):
+        """
+        Add a horizontal bar graph to the plot (similar to matplotlib's barh).
+        
+        y_values: 1D array-like y positions for bars (vertical positions).
+        widths: 1D array-like widths for bars (horizontal lengths, must match length of y_values).
+        bar_height: Height (thickness) of each bar in data coordinates. If None, auto-calculated from spacing.
+        color: Bar color.
+        label: Legend label.
+        alpha: Bar opacity (0-1).
+        animate: Total animation duration in seconds (all bars complete within this time).
+        drop_shadow: Whether to add drop shadow effect.
+        bar_duration: Duration for each individual bar animation in seconds. If None, bars animate 
+                      sequentially without overlap (each gets animate/n_bars seconds). If specified,
+                      bars will overlap - e.g., animate=5.0 with bar_duration=1.0 creates smooth 
+                      overlapping animations where each bar takes 1 second but spreads over 5 seconds total.
+        bar_anim_times: (Deprecated, use bar_duration) Optional list of per-bar animation durations.
+        animate_downward (bool): If True, bars animate from top y to bottom y
+                     (downward). Default animates bottom-to-top.
+        
+        Example:
+            # Smooth overlapping animations
+            plot = AEGraph().barh(y_positions, values, animate=5.0, bar_duration=1.0)
+            
+            # Sequential animations (no overlap)
+            plot = AEGraph().barh(y_positions, values, animate=5.0)
+        """
+        # Support pandas Series
+        if pd is not None:
+            if isinstance(y_values, pd.Series):
+                y_values = y_values.values
+            if isinstance(widths, pd.Series):
+                widths = widths.values
+        
+        y_values = np.asarray(y_values)
+        widths = np.asarray(widths)
+        
+        if len(y_values) != len(widths):
+            raise ValueError("y_values and widths must have the same length")
+        
+        # Auto-calculate bar height if not specified
+        if bar_height is None:
+            if len(y_values) > 1:
+                # Use 80% of the minimum spacing between consecutive y values
+                spacings = np.diff(np.sort(y_values))
+                min_spacing = np.min(spacings[spacings > 0]) if len(spacings) > 0 and np.any(spacings > 0) else 1.0
+                bar_height = 0.8 * min_spacing
+            else:
+                bar_height = 1.0  # Default for single bar
+        
+        # Calculate bin edges for each bar (bottom and top edges)
+        half_height = bar_height / 2
+        bin_bottom = y_values - half_height
+        bin_top = y_values + half_height
+        bin_centers = y_values.copy()  # y_values are already the centers
+        
+        # Use bar_duration if specified, otherwise fall back to bar_anim_times
+        if bar_duration is not None:
+            bar_anim_times = bar_duration
+        
+        self.elements.append({
+            "type": "barh",
+            "bin_bottom": list(bin_bottom),
+            "bin_top": list(bin_top),
+            "bin_centers": list(bin_centers),
+            "widths": list(widths),
+            "color": color,
+            "label": label,
+            "alpha": alpha,
+            "animate": animate,
+            "drop_shadow": drop_shadow,
+            "bar_anim_times": bar_anim_times,
+            "animate_downward": animate_downward,
+            "delay": delay,
+            **kwargs
+        })
+        if label:
+            self.legend.append(label)
+        return self
+
     def gradient(self, color_start, color_end):
         """
-        Apply a color gradient to the most recently added histogram or bar_graph.
+        Apply a color gradient to the most recently added histogram, bar_graph, or barh.
         Supports named colors, 0–1 floats, or 0–255 ints.
         """
         if not self.elements:
-            raise ValueError("No elements to apply gradient to. Add a histogram or bar_graph first.")
+            raise ValueError("No elements to apply gradient to. Add a histogram, bar_graph, or barh first.")
 
         # Get the last element
         last_elem = self.elements[-1]
-        if last_elem["type"] not in ["histogram", "bar_graph"]:
-            raise ValueError("Gradient can only be applied to histogram or bar_graph elements.")
+        if last_elem["type"] not in ["histogram", "bar_graph", "barh"]:
+            raise ValueError("Gradient can only be applied to histogram, bar_graph, or barh elements.")
 
         def normalize_color(c):
             if isinstance(c, str):
@@ -435,7 +517,10 @@ class AEGraph:
         end_rgb = normalize_color(color_end)
 
         # Calculate number of bars
-        n_bars = len(last_elem["heights"])
+        if last_elem["type"] == "barh":
+            n_bars = len(last_elem["widths"])
+        else:
+            n_bars = len(last_elem["heights"])
         if n_bars <= 1:
             last_elem["gradient_colors"] = [start_rgb]
         else:
@@ -529,6 +614,9 @@ class AEGraph:
                     all_x.extend(elem.get("bin_left", []))
                     all_x.extend(elem.get("bin_right", []))
                     all_x.extend(elem.get("bin_centers", []))
+                elif elem["type"] == "barh":
+                    all_x.extend(elem.get("widths", []))
+                    all_x.append(0)  # include baseline
             if not all_x:
                 all_x = [0, 1]  # fallback if nothing plotted
 
@@ -561,6 +649,10 @@ class AEGraph:
                     all_y.extend(elem.get("y", []))
                 elif elem["type"] in ["histogram", "bar_graph"]:
                     all_y.extend(elem.get("heights", []))
+                elif elem["type"] == "barh":
+                    all_y.extend(elem.get("bin_bottom", []))
+                    all_y.extend(elem.get("bin_top", []))
+                    all_y.extend(elem.get("bin_centers", []))
             if not all_y:
                 all_y = [0, 1]  # fallback if nothing plotted
 
@@ -730,11 +822,15 @@ if (comp && comp instanceof CompItem) {
         
         return "".join(jsx)
 
-    def _generate_axes_jsx(self, script, center_x, center_y, xmin_pad, xmax_pad, ymin_pad, ymax_pad, ANIM_DURATION):
+    def _generate_axes_jsx(self, script, center_x, center_y, xmin_pad, xmax_pad, ymin_pad, ymax_pad, ANIM_DURATION, has_barh=False):
         """Helper function to generate axes and ticks JSX code."""
         # Axes: y-axis at x=0 if in range, else at left; x-axis at y=0 if in range, else at bottom
+        # For barh charts, always put x-axis at bottom (ymin_pad) so it doesn't intersect bars
         y_axis_x = 0 if xmin_pad <= 0 <= xmax_pad else xmin_pad
-        x_axis_y = 0 if ymin_pad <= 0 <= ymax_pad else ymin_pad
+        if has_barh:
+            x_axis_y = ymin_pad  # Always at bottom for horizontal bar charts
+        else:
+            x_axis_y = 0 if ymin_pad <= 0 <= ymax_pad else ymin_pad
         # Clamp axis reference values to visible range for tick placement
         y_axis_x = min(max(y_axis_x, xmin_pad), xmax_pad)
         x_axis_y = min(max(x_axis_y, ymin_pad), ymax_pad)
@@ -825,12 +921,14 @@ if (comp && comp instanceof CompItem) {
                 script.append(f"var xtickStroke{pos_var} = xtickContents{pos_var}.addProperty('ADBE Vector Graphic - Stroke');\n")
                 script.append(f"xtickStroke{pos_var}.property('ADBE Vector Stroke Color').setValue([0, 0, 0]);\n")
                 script.append(f"xtickStroke{pos_var}.property('ADBE Vector Stroke Width').setValue(2);\n")
-                # Fade-in animation for tick mark
-                script.append(f"xtickStroke{pos_var}.property('ADBE Vector Stroke Opacity').setValueAtTime(0, 0);\n")
-                script.append(f"xtickStroke{pos_var}.property('ADBE Vector Stroke Opacity').setValueAtTime({ANIM_DURATION * (0.7 + 0.3 * idx / 10)}, 100);\n")
-                # Apply easy ease to X tick stroke opacity keyframes
-                if self.easy_ease:
-                    script.append(f"applyEasyEase(xtickStroke{pos_var}.property('ADBE Vector Stroke Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+                # Opacity animation for tick mark (constant duration or disabled)
+                if self.animate_opacity:
+                    script.append(f"xtickStroke{pos_var}.property('ADBE Vector Stroke Opacity').setValueAtTime(0, 0);\n")
+                    script.append(f"xtickStroke{pos_var}.property('ADBE Vector Stroke Opacity').setValueAtTime({ANIM_DURATION * 0.8}, 100);\n")
+                    if self.easy_ease:
+                        script.append(f"applyEasyEase(xtickStroke{pos_var}.property('ADBE Vector Stroke Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+                else:
+                    script.append(f"xtickStroke{pos_var}.property('ADBE Vector Stroke Opacity').setValue(100);\n")
                 # Tick label: just below the tick, in graph-local coordinates
                 if self.show_tick_labels:
                     lx, ly = self._data_to_shape(pos, x_axis_y, xmin_pad, xmax_pad, ymin_pad, ymax_pad)
@@ -844,12 +942,14 @@ if (comp && comp instanceof CompItem) {
                     script.append(f"xtickLabelDoc{pos_var}.fillColor = [0, 0, 0];\n")
                     script.append(f"xtickLabelDoc{pos_var}.justification = ParagraphJustification.CENTER_JUSTIFY;\n")
                     script.append(f"xtickLabelProp{pos_var}.setValue(xtickLabelDoc{pos_var});\n")
-                    # Fade-in animation for label
-                    script.append(f"xtickLabel{pos_var}.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
-                    script.append(f"xtickLabel{pos_var}.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * (0.8 + 0.2 * idx / 10)}, 100);\n")
-                    # Apply easy ease to X tick label opacity keyframes
-                    if self.easy_ease:
-                        script.append(f"applyEasyEase(xtickLabel{pos_var}.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+                    # Opacity animation for label (constant duration or disabled)
+                    if self.animate_opacity:
+                        script.append(f"xtickLabel{pos_var}.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
+                        script.append(f"xtickLabel{pos_var}.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * 0.9}, 100);\n")
+                        if self.easy_ease:
+                            script.append(f"applyEasyEase(xtickLabel{pos_var}.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+                    else:
+                        script.append(f"xtickLabel{pos_var}.property('Transform').property('Opacity').setValue(100);\n")
         # Y Ticks
         if self.yticks:
             for idx, (pos, label) in enumerate(self.yticks):
@@ -872,12 +972,14 @@ if (comp && comp instanceof CompItem) {
                 script.append(f"var ytickStroke{pos_var} = ytickContents{pos_var}.addProperty('ADBE Vector Graphic - Stroke');\n")
                 script.append(f"ytickStroke{pos_var}.property('ADBE Vector Stroke Color').setValue([0, 0, 0]);\n")
                 script.append(f"ytickStroke{pos_var}.property('ADBE Vector Stroke Width').setValue(2);\n")
-                # Fade-in animation for tick mark
-                script.append(f"ytickStroke{pos_var}.property('ADBE Vector Stroke Opacity').setValueAtTime(0, 0);\n")
-                script.append(f"ytickStroke{pos_var}.property('ADBE Vector Stroke Opacity').setValueAtTime({ANIM_DURATION * (0.7 + 0.3 * idx / 10)}, 100);\n")
-                # Apply easy ease to Y tick stroke opacity keyframes
-                if self.easy_ease:
-                    script.append(f"applyEasyEase(ytickStroke{pos_var}.property('ADBE Vector Stroke Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+                # Opacity animation for tick mark (constant duration or disabled)
+                if self.animate_opacity:
+                    script.append(f"ytickStroke{pos_var}.property('ADBE Vector Stroke Opacity').setValueAtTime(0, 0);\n")
+                    script.append(f"ytickStroke{pos_var}.property('ADBE Vector Stroke Opacity').setValueAtTime({ANIM_DURATION * 0.8}, 100);\n")
+                    if self.easy_ease:
+                        script.append(f"applyEasyEase(ytickStroke{pos_var}.property('ADBE Vector Stroke Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+                else:
+                    script.append(f"ytickStroke{pos_var}.property('ADBE Vector Stroke Opacity').setValue(100);\n")
                 # Tick label: just left of the tick, in graph-local coordinates
                 if self.show_tick_labels:
                     lx, ly = self._data_to_shape(y_axis_x, pos, xmin_pad, xmax_pad, ymin_pad, ymax_pad)
@@ -889,14 +991,16 @@ if (comp && comp instanceof CompItem) {
                     script.append(f"var ytickLabelDoc{pos_var} = ytickLabelProp{pos_var}.value;\n")
                     script.append(f"ytickLabelDoc{pos_var}.fontSize = 16;\n")
                     script.append(f"ytickLabelDoc{pos_var}.fillColor = [0, 0, 0];\n")
-                    script.append(f"ytickLabelDoc{pos_var}.justification = ParagraphJustification.CENTER_JUSTIFY;\n")
+                    script.append(f"ytickLabelDoc{pos_var}.justification = ParagraphJustification.RIGHT_JUSTIFY;\n")
                     script.append(f"ytickLabelProp{pos_var}.setValue(ytickLabelDoc{pos_var});\n")
-                    # Fade-in animation for label
-                    script.append(f"ytickLabel{pos_var}.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
-                    script.append(f"ytickLabel{pos_var}.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * (0.8 + 0.2 * idx / 10)}, 100);\n")
-                    # Apply easy ease to Y tick label opacity keyframes
-                    if self.easy_ease:
-                        script.append(f"applyEasyEase(ytickLabel{pos_var}.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+                    # Opacity animation for label (constant duration or disabled)
+                    if self.animate_opacity:
+                        script.append(f"ytickLabel{pos_var}.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
+                        script.append(f"ytickLabel{pos_var}.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * 0.9}, 100);\n")
+                        if self.easy_ease:
+                            script.append(f"applyEasyEase(ytickLabel{pos_var}.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+                    else:
+                        script.append(f"ytickLabel{pos_var}.property('Transform').property('Opacity').setValue(100);\n")
 
     def _generate_jsx(self) -> str:
         ANIM_DURATION = 3 * (1/2)  # seconds for default animation
@@ -982,6 +1086,25 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
                 all_x.extend(elem["bin_right"])
                 all_y.extend(elem["heights"])
                 all_y.append(0)  # include baseline
+            elif elem["type"] == "barh":
+                # Use widths for x, bin edges for y
+                all_x.extend(elem["widths"])
+                all_x.append(0)  # include baseline
+                all_y.extend(elem["bin_centers"])
+                all_y.extend(elem["bin_bottom"])
+                all_y.extend(elem["bin_top"])
+                # Add padding equal to the gap between bars
+                if len(elem["bin_bottom"]) > 1:
+                    # Calculate the gap between bars from the bar dimensions
+                    centers = sorted(elem["bin_centers"])
+                    spacing = centers[1] - centers[0]  # distance between consecutive bar centers
+                    bar_height = elem["bin_top"][0] - elem["bin_bottom"][0]  # height of one bar
+                    gap = spacing - bar_height  # gap between bars
+                    # Add padding equal to one gap
+                    min_y = min(elem["bin_bottom"])
+                    max_y = max(elem["bin_top"])
+                    all_y.append(min_y - gap)
+                    all_y.append(max_y + gap)
         if self.xlim:
             xmin, xmax = self.xlim
         else:
@@ -997,7 +1120,8 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
         ymax_pad = ymax
         # Check what plot types we have to decide on axes placement
         has_scatter = any(elem["type"] == "scatter" for elem in self.elements)
-        has_bars_or_hist = any(elem["type"] in ["histogram", "bar_graph"] for elem in self.elements)
+        has_bars_or_hist = any(elem["type"] in ["histogram", "bar_graph", "barh"] for elem in self.elements)
+        has_barh = any(elem["type"] == "barh" for elem in self.elements)
         
         # For grid lines, fade in with opacity (GENERATED FIRST so grid appears behind plot elements)
         if self.show_grid:
@@ -1058,7 +1182,7 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
         # Generate axes BEFORE plot elements ONLY for scatter plots (so axes appear behind points)
         # For histograms and bar graphs, axes will be generated AFTER plot elements (so they appear on top)
         if has_scatter and not has_bars_or_hist:
-            self._generate_axes_jsx(script, center_x, center_y, xmin_pad, xmax_pad, ymin_pad, ymax_pad, ANIM_DURATION)
+            self._generate_axes_jsx(script, center_x, center_y, xmin_pad, xmax_pad, ymin_pad, ymax_pad, ANIM_DURATION, has_barh)
 
         # Plot elements
         for i, elem in enumerate(self.elements):
@@ -1270,11 +1394,115 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
                         script.append(f"applyEasyEase(barScale{i}_{j}, {self.ease_speed}, {self.ease_influence});\n")
                     if elem.get("drop_shadow", False):
                         script.append(self._generate_drop_shadow_jsx(f"barLayer{i}_{j}", f"{i}_{j}"))
+            elif elem["type"] == "barh":
+                # Horizontal bar graph rendering
+                alpha = elem.get("alpha", 0.8)
+                bin_bottom = elem["bin_bottom"]
+                bin_top = elem["bin_top"]
+                widths = elem["widths"]
+                n_bars = len(bin_bottom)
+                bar_anim_times = elem.get("bar_anim_times")
+                total_anim = elem["animate"] if elem["animate"] else 1.0
+                animate_downward = elem.get("animate_downward", False)
+                
+                # Handle bar_anim_times (individual bar duration)
+                if bar_anim_times is None:
+                    # Default: sequential animation, no overlap
+                    individual_duration = total_anim / n_bars
+                    bar_anim_times = [individual_duration] * n_bars
+                    # Bars animate one after another
+                    start_times_base = np.linspace(0, total_anim - individual_duration, n_bars)
+                elif isinstance(bar_anim_times, (int, float)):
+                    # User specified individual bar duration - enable overlapping
+                    individual_duration = float(bar_anim_times)
+                    bar_anim_times = [individual_duration] * n_bars
+                    if n_bars > 1:
+                        # Distribute start times so all bars finish within total_anim
+                        # Last bar starts at (total_anim - individual_duration) and finishes at total_anim
+                        start_times_base = np.linspace(0, max(0, total_anim - individual_duration), n_bars)
+                    else:
+                        start_times_base = [0]
+                else:
+                    # List of durations provided
+                    if not hasattr(bar_anim_times, '__iter__') or len(bar_anim_times) != n_bars:
+                        bar_anim_times = [total_anim / n_bars] * n_bars
+                    start_times_base = np.linspace(0, total_anim - bar_anim_times[0], n_bars)
+
+                # Reorder start times to animate downward (top to bottom) if requested
+                centers = np.asarray(elem.get("bin_centers", []))
+                if animate_downward and len(centers) == n_bars:
+                    order = np.argsort(centers)[::-1]  # descending by y value (top to bottom)
+                    start_times = [0.0] * n_bars
+                    for rank, j_idx in enumerate(order):
+                        start_times[j_idx] = float(start_times_base[rank])
+                else:
+                    start_times = start_times_base
+                
+                # Check if gradient colors are defined
+                gradient_colors = elem.get("gradient_colors")
+                if not gradient_colors:
+                    # Use single color for all bars
+                    color_js = color_to_js(elem["color"])
+                
+                for j, (bottom, top, width) in enumerate(zip(bin_bottom, bin_top, widths)):
+                    # Use gradient color for this bar if available
+                    if gradient_colors and j < len(gradient_colors):
+                        bar_color_js = f"[{gradient_colors[j][0]}, {gradient_colors[j][1]}, {gradient_colors[j][2]}]"
+                    else:
+                        bar_color_js = color_js
+                    
+                    # Rectangle corners in data coordinates (horizontal bars)
+                    # Apply horizontal clipping to [xmin_pad, xmax_pad] when show_all_points is False
+                    clip = not self.show_all_points
+                    if width >= 0:
+                        bar_start, bar_end = 0, width
+                    else:
+                        bar_start, bar_end = width, 0
+                    if clip:
+                        xi0 = max(bar_start, xmin_pad)
+                        xi1 = min(bar_end, xmax_pad)
+                    else:
+                        xi0, xi1 = bar_start, bar_end
+                    # If fully out of bounds, skip drawing this bar
+                    if xi1 <= xi0 + 1e-12:
+                        continue
+                    x0, y0 = xi0, bottom  # left boundary after clipping
+                    x1, y1 = xi1, top     # right boundary after clipping
+                    # Convert to shape coordinates
+                    sx0, sy0 = self._data_to_shape(x0, y0, xmin_pad, xmax_pad, ymin_pad, ymax_pad)
+                    sx1, sy1 = self._data_to_shape(x1, y1, xmin_pad, xmax_pad, ymin_pad, ymax_pad)
+                    bar_width = abs(sx1 - sx0)  # horizontal extent
+                    bar_height = abs(sy1 - sy0)  # vertical thickness
+                    anchor_x = sx0  # left boundary (after clipping)
+                    anchor_y = (sy0 + sy1) / 2  # center vertically
+                    position_x = center_x + anchor_x
+                    position_y = center_y + anchor_y
+                    script.append(f"var barhLayer{i}_{j} = comp.layers.addShape();\n")
+                    script.append(f"barhLayer{i}_{j}.name = 'BarhBar_{i}_{j}';\n")
+                    script.append(f"barhLayer{i}_{j}.property('Transform').property('Position').setValue([{position_x}, {position_y}]);\n")
+                    script.append(f"barhLayer{i}_{j}.parent = PlotAnchor;\n")
+                    script.append(f"var barhContents{i}_{j} = barhLayer{i}_{j}.property('ADBE Root Vectors Group');\n")
+                    script.append(f"var barhRect{i}_{j} = barhContents{i}_{j}.addProperty('ADBE Vector Shape - Rect');\n")
+                    script.append(f"barhRect{i}_{j}.property('ADBE Vector Rect Size').setValue([{bar_width}, {bar_height}]);\n")
+                    script.append(f"barhRect{i}_{j}.property('ADBE Vector Rect Position').setValue([{bar_width/2}, 0]);\n")
+                    script.append(f"var barhFill{i}_{j} = barhContents{i}_{j}.addProperty('ADBE Vector Graphic - Fill');\n")
+                    script.append(f"barhFill{i}_{j}.property('ADBE Vector Fill Color').setValue({bar_color_js});\n")
+                    script.append(f"barhFill{i}_{j}.property('ADBE Vector Fill Opacity').setValue({int(alpha*100)});\n")
+                    # Animate bar width (scale X from axis)
+                    anim_time = bar_anim_times[j]
+                    start_time = start_times[j]
+                    script.append(f"var barhScale{i}_{j} = barhLayer{i}_{j}.property('Transform').property('Scale');\n")
+                    script.append(f"barhScale{i}_{j}.setValueAtTime({delay + start_time}, [0, 100, 100]);\n")
+                    script.append(f"barhScale{i}_{j}.setValueAtTime({delay + start_time + anim_time}, [100, 100, 100]);\n")
+                    if self.easy_ease:
+                        script.append(f"applyEasyEase(barhScale{i}_{j}, {self.ease_speed}, {self.ease_influence});\n")
+                    if elem.get("drop_shadow", False):
+                        script.append(self._generate_drop_shadow_jsx(f"barhLayer{i}_{j}", f"{i}_{j}"))
 
         # Generate axes AFTER plot elements for histograms and bar graphs (so they appear on top)
         # Mixed plots get axes on top to accommodate bar/histogram rendering
         if has_bars_or_hist or not has_scatter:
-            self._generate_axes_jsx(script, center_x, center_y, xmin_pad, xmax_pad, ymin_pad, ymax_pad, ANIM_DURATION)
+            self._generate_axes_jsx(script, center_x, center_y, xmin_pad, xmax_pad, ymin_pad, ymax_pad, ANIM_DURATION, has_barh)
 
         # --- DYNAMIC LEGEND PLACEMENT (relative to graph area) ---
         legend_entries = []
@@ -1302,6 +1530,9 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
             elif elem["type"] in ["histogram", "bar_graph"]:
                 px = elem["bin_centers"]
                 py = elem["heights"]
+            elif elem["type"] == "barh":
+                px = elem["widths"]
+                py = elem["bin_centers"]
             else:
                 continue
 
@@ -1379,10 +1610,13 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
             script.append("titleProp.setValue(titleDoc);\n")
             
             # Animate title
-            script.append(f"titleLayer.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
-            script.append(f"titleLayer.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * 1.1}, 100);\n")
-            if self.easy_ease:
-                script.append(f"applyEasyEase(titleLayer.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+            if self.animate_opacity:
+                script.append(f"titleLayer.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
+                script.append(f"titleLayer.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * 0.9}, 100);\n")
+                if self.easy_ease:
+                    script.append(f"applyEasyEase(titleLayer.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+            else:
+                script.append(f"titleLayer.property('Transform').property('Opacity').setValue(100);\n")
             
             # Add drop shadow to title if specified
             if self.drop_shadow:
@@ -1408,10 +1642,13 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
             script.append("xlabelProp.setValue(xlabelDoc);\n")
             
             # Animate xlabel
-            script.append(f"xlabelLayer.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
-            script.append(f"xlabelLayer.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * 1.2}, 100);\n")
-            if self.easy_ease:
-                script.append(f"applyEasyEase(xlabelLayer.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+            if self.animate_opacity:
+                script.append(f"xlabelLayer.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
+                script.append(f"xlabelLayer.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * 0.9}, 100);\n")
+                if self.easy_ease:
+                    script.append(f"applyEasyEase(xlabelLayer.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+            else:
+                script.append(f"xlabelLayer.property('Transform').property('Opacity').setValue(100);\n")
             
             # Add drop shadow to x-label if specified
             if self.drop_shadow:
@@ -1436,10 +1673,13 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
             script.append("ylabelProp.setValue(ylabelDoc);\n")
             
             # Animate ylabel
-            script.append(f"ylabelLayer.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
-            script.append(f"ylabelLayer.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * 1.2}, 100);\n")
-            if self.easy_ease:
-                script.append(f"applyEasyEase(ylabelLayer.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+            if self.animate_opacity:
+                script.append(f"ylabelLayer.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
+                script.append(f"ylabelLayer.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * 0.9}, 100);\n")
+                if self.easy_ease:
+                    script.append(f"applyEasyEase(ylabelLayer.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+            else:
+                script.append(f"ylabelLayer.property('Transform').property('Opacity').setValue(100);\n")
             
             # Add drop shadow to y-label if specified
             if self.drop_shadow:
