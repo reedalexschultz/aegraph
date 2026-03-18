@@ -1,6 +1,7 @@
 import datetime
 import numpy as np
 from typing import List, Tuple, Optional, Union
+import csv
 import math
 try:
     import pandas as pd
@@ -54,13 +55,23 @@ DEFAULT_DROP_SHADOW = {
 
 
 def color_to_js(color: Union[str, List[float], Tuple[float, float, float]]) -> str:
-    """Convert color name or RGB list/tuple to JS array string."""
+    """Convert color name or RGB list/tuple to AE-friendly JS array [r,g,b].
+
+    Accepts:
+    - Named colors from COLOR_NAMES (0–1 floats)
+    - RGB lists/tuples either in 0–1 floats or 0–255 ints
+    """
     if isinstance(color, str):
         rgb = COLOR_NAMES.get(color.lower())
         if rgb is None:
             raise ValueError(f"Unknown color name: {color}")
     elif isinstance(color, (list, tuple)) and len(color) == 3:
-        rgb = color
+        rgb = list(color)
+        # Auto-normalize 0–255 integers to 0–1 floats for AE
+        if max(rgb) > 1:
+            rgb = [float(v) / 255.0 for v in rgb]
+        else:
+            rgb = [float(v) for v in rgb]
     else:
         raise ValueError("Color must be a name or 3-value RGB list/tuple.")
     return f"[{rgb[0]}, {rgb[1]}, {rgb[2]}]"
@@ -129,6 +140,9 @@ class AEGraph:
                  ease_speed=00,
                  ease_influence=33,
                  animate_opacity=True,
+                 animate_axes=True,
+                 ui_color: Union[str, List[float], Tuple[float, float, float]] = "black",
+                 font_scale: float = 1.0,
                  bg_stroke_width = 0,
                  bg_stroke_color = [0.15, 0.15, 0.15],
                  fps=24):
@@ -138,7 +152,8 @@ class AEGraph:
             width (int): Graph logical width (default: 1920)
             height (int): Graph logical height (default: 1080)
             comp_name (str): Name of the AE composition (default: "AEGraph_Comp")
-            bg_color (str or list): Background color name or RGB list (default: "white")
+            bg_color (str or list): Background color name or RGB list (default: "white").
+                Pass "none" to omit the background rectangle entirely.
             comp_width/compheight/compwidth/compheight (int, optional): AE composition width/height (default: width/height)
             position (tuple, optional): (x, y) center of graph in comp coordinates (default: comp center)
             show_all_points (bool): Whether to plot all points or only those within bounds (default: False)
@@ -149,6 +164,11 @@ class AEGraph:
             ease_speed (int): Easy ease speed percentage (default: 00)
             ease_influence (int): Easy ease influence percentage (default: 33)
             fps (int): Frame rate for the After Effects composition (default: 24)
+            ui_color (str or list/tuple): Color for all non-data UI elements like axes, tick marks,
+                all tick/label/title/legend/annotation text (default: "black"). Accepts named colors
+                from COLOR_NAMES or RGB values in 0–1 floats or 0–255 ints.
+            font_scale (float): Global scale multiplier for all text sizes (ticks, labels, title,
+                legend, and annotations). Default 1.0.
         """
         self.width = width
         self.height = height
@@ -189,9 +209,14 @@ class AEGraph:
         self.ease_speed = ease_speed  # Easy ease speed percentage
         self.ease_influence = ease_influence  # Easy ease influence percentage
         self.animate_opacity = animate_opacity  # Enable/disable opacity fade animations
+        self.animate_axes = animate_axes  # Enable/disable Trim Paths animation for axes
         self.fps = fps  # Frame rate for the After Effects composition
         self.bg_stroke_color = bg_stroke_color
         self.bg_stroke_width = bg_stroke_width
+        self.ui_color = ui_color
+        self.font_scale = float(font_scale) if font_scale is not None else 1.0
+        # Tick formatting flags
+        self.percent_tick_labels = False  # When True, x-ticks render as absolute percentages
 
     def _filter_points(self, x, y):
         """
@@ -406,7 +431,7 @@ class AEGraph:
             self.legend.append(label)
         return self
 
-    def barh(self, y_values, widths, bar_height=None, color="p_blue", label=None, delay=0.0, alpha=0.8, animate=1.0, drop_shadow=False, bar_duration=None, bar_anim_times=None, animate_downward: bool = False, **kwargs):
+    def barh(self, y_values, widths, bar_height=None, color="p_blue", label=None, delay=0.0, alpha=0.8, animate=1.0, drop_shadow=False, bar_duration=None, bar_anim_times=None, animate_downward: bool = False, anchor_at_y_axis: bool = False, **kwargs):
         """
         Add a horizontal bar graph to the plot (similar to matplotlib's barh).
         
@@ -479,11 +504,167 @@ class AEGraph:
             "drop_shadow": drop_shadow,
             "bar_anim_times": bar_anim_times,
             "animate_downward": animate_downward,
+            "anchor_at_y_axis": anchor_at_y_axis,
             "delay": delay,
             **kwargs
         })
         if label:
             self.legend.append(label)
+        return self
+
+    def add_population_pyramid(self,
+                               csv_path: Optional[str] = None,
+                               ages: Optional[List[str]] = None,
+                               male: Optional[List[float]] = None,
+                               female: Optional[List[float]] = None,
+                               mode: str = "percent",
+                               animate: float = 5.0,
+                               bar_duration: Optional[float] = 1.0,
+                               animate_downward: bool = True,
+                               show_grid: bool = True,
+                               color_male: Union[str, List[float], Tuple[float, float, float]] = [73, 118, 222],
+                               color_female: Union[str, List[float], Tuple[float, float, float]] = [168, 61, 104],
+                               label_male: Optional[str] = "Male",
+                               label_female: Optional[str] = "Female",
+                               drop_shadow: Optional[bool] = None,
+                               ):
+        """
+        Add a mirrored horizontal bar chart (population pyramid) to the current graph.
+
+        Provide either `csv_path` to a file with three columns (age, male, female)
+        or pass `ages`, `male`, and `female` arrays directly.
+
+        mode: 'percent' to compute per-age-group share of total population (%),
+              'counts' to use raw counts (auto-scaled if very large).
+
+        Returns self for chaining.
+
+        drop_shadow:
+            - If True, apply the same Drop Shadow effect used for axes to the pyramid bars.
+            - If False, do not add drop shadows to bars.
+            - If None (default), inherit from the global `self.drop_shadow` setting.
+        """
+        # Load data
+        if csv_path is not None:
+            df = None
+            if pd is not None:
+                # Try common separators
+                for sep, kwargs in [("\t", {}), (",", {}), (None, {"delim_whitespace": True})]:
+                    try:
+                        dft = pd.read_csv(csv_path, sep=sep, header=None, **kwargs)
+                        if dft.shape[1] >= 3:
+                            df = dft.iloc[:, :3]
+                            df.columns = ["age", "male", "female"]
+                            break
+                    except Exception:
+                        continue
+            if df is None:
+                # Fallback to csv module
+                rows = []
+                with open(csv_path, "r", newline="") as f:
+                    content = f.read().strip().splitlines()
+                for line in content:
+                    if not line.strip():
+                        continue
+                    # Try tab, comma, then whitespace split
+                    for delim in ["\t", ","]:
+                        if delim in line:
+                            parts = [p.strip() for p in line.split(delim)]
+                            break
+                    else:
+                        parts = line.split()
+                    if len(parts) < 3:
+                        continue
+                    rows.append((parts[0], float(parts[1]), float(parts[2])))
+                ages = [r[0] for r in rows]
+                male = [r[1] for r in rows]
+                female = [r[2] for r in rows]
+            else:
+                ages = df["age"].astype(str).tolist()
+                male = df["male"].astype(float).tolist()
+                female = df["female"].astype(float).tolist()
+        else:
+            if ages is None or male is None or female is None:
+                raise ValueError("Provide either csv_path or ages/male/female arrays.")
+
+        # Convert to numpy arrays
+        male_arr = np.asarray(male, dtype=float)
+        female_arr = np.asarray(female, dtype=float)
+        n = len(ages)
+        y_positions = np.arange(n)
+
+        # Compute widths
+        if mode == "counts":
+            # Scale down if extremely large to keep x-range manageable
+            max_val = float(max(np.max(male_arr), np.max(female_arr)))
+            scale = 1.0
+            if max_val > 1_000_000:
+                scale = 1_000.0
+            male_w = -male_arr / scale
+            female_w = female_arr / scale
+            xlabel = "Population (scaled)"
+        else:
+            total = float(male_arr.sum() + female_arr.sum())
+            if total <= 0:
+                raise ValueError("Total population is zero; cannot compute percentages")
+            male_pct = (male_arr / total) * 100.0
+            female_pct = (female_arr / total) * 100.0
+            male_w = -male_pct
+            female_w = female_pct
+            xlabel = "Population (%)"
+
+        # Symmetric limits
+        max_abs = float(max(np.max(np.abs(male_w)), np.max(np.abs(female_w))))
+        xpad = max_abs * 0.1
+        xmin, xmax = -(max_abs + xpad), (max_abs + xpad)
+
+        # Determine whether to add drop shadow to bars
+        bar_shadow = self.drop_shadow if drop_shadow is None else bool(drop_shadow)
+
+        # Add bars
+        self.barh(
+            y_positions,
+            male_w,
+            animate=animate,
+            bar_duration=bar_duration,
+            alpha=0.9,
+            color=color_male,
+            label=label_male,
+            animate_downward=animate_downward,
+            anchor_at_y_axis=True,
+            drop_shadow=bar_shadow,
+        )
+        self.barh(
+            y_positions,
+            female_w,
+            animate=animate,
+            bar_duration=bar_duration,
+            alpha=0.9,
+            color=color_female,
+            label=label_female,
+            animate_downward=animate_downward,
+            anchor_at_y_axis=True,
+            drop_shadow=bar_shadow,
+        )
+
+        # Axes and labels
+        self.set_xlabel(xlabel)
+        self.set_yticks(positions=y_positions, labels=ages)
+        self.set_xlim(xmin, xmax)
+        # Ensure percent tick labels by default for pyramids in percent mode
+        if mode == "percent":
+            self.percent_tick_labels = True
+        # Format x-ticks as absolute percent labels for population pyramids
+        positions = self._nice_ticks(xmin, xmax, nticks=7)
+        step = positions[1] - positions[0] if len(positions) > 1 else 1.0
+        if abs(step) < 1:
+            labels = [f"{abs(p):.1f}%" for p in positions]
+        else:
+            labels = [f"{abs(p):.0f}%" for p in positions]
+        self.set_xticks(positions=positions, labels=labels)
+        if show_grid:
+            self.grid(show=True, color="lightgray", alpha=0.25)
+
         return self
 
     def gradient(self, color_start, color_end):
@@ -632,7 +813,14 @@ class AEGraph:
             positions = self._nice_ticks(xmin, xmax, nticks)
 
         if labels is None:
-            labels = [str(pos) for pos in positions]
+            if self.percent_tick_labels:
+                step = positions[1] - positions[0] if len(positions) > 1 else 1.0
+                if abs(step) < 1:
+                    labels = [f"{abs(pos):.1f}%" for pos in positions]
+                else:
+                    labels = [f"{abs(pos):.0f}%" for pos in positions]
+            else:
+                labels = [str(pos) for pos in positions]
 
         self.xticks = list(zip(positions, labels))
         return self
@@ -857,17 +1045,18 @@ if (comp && comp instanceof CompItem) {
         script.append("axesShape.closed = false;\n")
         script.append("axesPath.setValue(axesShape);\n")
         script.append("var axesStroke = axesContents.addProperty('ADBE Vector Graphic - Stroke');\n")
-        script.append("axesStroke.property('ADBE Vector Stroke Color').setValue([0, 0, 0]);\n")
+        script.append(f"axesStroke.property('ADBE Vector Stroke Color').setValue({color_to_js(self.ui_color)});\n")
         script.append("axesStroke.property('ADBE Vector Stroke Width').setValue(3);\n")
         script.append("axesStroke.property('ADBE Vector Stroke Opacity').setValue(100);\n")
-        # Animate axes with Trim Paths
-        script.append("var axesTrim = axesContents.addProperty('ADBE Vector Filter - Trim');\n")
-        script.append(f"var axesTrimEnd = axesTrim.property('ADBE Vector Trim End');\n")
-        script.append(f"axesTrimEnd.setValueAtTime(0, 0);\n")
-        script.append(f"axesTrimEnd.setValueAtTime({ANIM_DURATION}, 100);\n")
-        # Apply easy ease to axes trim path keyframes
-        if self.easy_ease:
-            script.append(f"applyEasyEase(axesTrimEnd, {self.ease_speed}, {self.ease_influence});\n")
+        # Animate axes with Trim Paths (optional)
+        if self.animate_axes:
+            script.append("var axesTrim = axesContents.addProperty('ADBE Vector Filter - Trim');\n")
+            script.append(f"var axesTrimEnd = axesTrim.property('ADBE Vector Trim End');\n")
+            script.append(f"axesTrimEnd.setValueAtTime(0, 0);\n")
+            script.append(f"axesTrimEnd.setValueAtTime({ANIM_DURATION}, 100);\n")
+            # Apply easy ease to axes trim path keyframes
+            if self.easy_ease:
+                script.append(f"applyEasyEase(axesTrimEnd, {self.ease_speed}, {self.ease_influence});\n")
         # Y axis
         script.append("var yAxisLayer = comp.layers.addShape();\n")
         script.append("yAxisLayer.name = \"Y-Axis\";\n")
@@ -881,17 +1070,18 @@ if (comp && comp instanceof CompItem) {
         script.append("yAxisShape.closed = false;\n")
         script.append("yAxisPath.setValue(yAxisShape);\n")
         script.append("var yAxisStroke = yAxisContents.addProperty('ADBE Vector Graphic - Stroke');\n")
-        script.append("yAxisStroke.property('ADBE Vector Stroke Color').setValue([0, 0, 0]);\n")
+        script.append(f"yAxisStroke.property('ADBE Vector Stroke Color').setValue({color_to_js(self.ui_color)});\n")
         script.append("yAxisStroke.property('ADBE Vector Stroke Width').setValue(3);\n")
         script.append("yAxisStroke.property('ADBE Vector Stroke Opacity').setValue(100);\n")
-        # Animate y axis with Trim Paths
-        script.append("var yAxisTrim = yAxisContents.addProperty('ADBE Vector Filter - Trim');\n")
-        script.append(f"var yAxisTrimEnd = yAxisTrim.property('ADBE Vector Trim End');\n")
-        script.append(f"yAxisTrimEnd.setValueAtTime(0, 0);\n")
-        script.append(f"yAxisTrimEnd.setValueAtTime({ANIM_DURATION}, 100);\n")
-        # Apply easy ease to Y axis trim path keyframes
-        if self.easy_ease:
-            script.append(f"applyEasyEase(yAxisTrimEnd, {self.ease_speed}, {self.ease_influence});\n")
+        # Animate y axis with Trim Paths (optional)
+        if self.animate_axes:
+            script.append("var yAxisTrim = yAxisContents.addProperty('ADBE Vector Filter - Trim');\n")
+            script.append(f"var yAxisTrimEnd = yAxisTrim.property('ADBE Vector Trim End');\n")
+            script.append(f"yAxisTrimEnd.setValueAtTime(0, 0);\n")
+            script.append(f"yAxisTrimEnd.setValueAtTime({ANIM_DURATION}, 100);\n")
+            # Apply easy ease to Y axis trim path keyframes
+            if self.easy_ease:
+                script.append(f"applyEasyEase(yAxisTrimEnd, {self.ease_speed}, {self.ease_influence});\n")
         
         # Add drop shadow to axes if specified
         if self.drop_shadow:
@@ -919,7 +1109,7 @@ if (comp && comp instanceof CompItem) {
                 script.append(f"xtickShape{pos_var}.closed = false;\n")
                 script.append(f"xtickPath{pos_var}.setValue(xtickShape{pos_var});\n")
                 script.append(f"var xtickStroke{pos_var} = xtickContents{pos_var}.addProperty('ADBE Vector Graphic - Stroke');\n")
-                script.append(f"xtickStroke{pos_var}.property('ADBE Vector Stroke Color').setValue([0, 0, 0]);\n")
+                script.append(f"xtickStroke{pos_var}.property('ADBE Vector Stroke Color').setValue({color_to_js(self.ui_color)});\n")
                 script.append(f"xtickStroke{pos_var}.property('ADBE Vector Stroke Width').setValue(2);\n")
                 # Opacity animation for tick mark (constant duration or disabled)
                 if self.animate_opacity:
@@ -938,10 +1128,13 @@ if (comp && comp instanceof CompItem) {
                     script.append(f"xtickLabel{pos_var}.parent = PlotAnchor;\n")
                     script.append(f"var xtickLabelProp{pos_var} = xtickLabel{pos_var}.property('Source Text');\n")
                     script.append(f"var xtickLabelDoc{pos_var} = xtickLabelProp{pos_var}.value;\n")
-                    script.append(f"xtickLabelDoc{pos_var}.fontSize = 16;\n")
-                    script.append(f"xtickLabelDoc{pos_var}.fillColor = [0, 0, 0];\n")
+                    script.append(f"xtickLabelDoc{pos_var}.fontSize = {int(16 * self.font_scale)};\n")
+                    script.append(f"xtickLabelDoc{pos_var}.fillColor = {color_to_js(self.ui_color)};\n")
                     script.append(f"xtickLabelDoc{pos_var}.justification = ParagraphJustification.CENTER_JUSTIFY;\n")
                     script.append(f"xtickLabelProp{pos_var}.setValue(xtickLabelDoc{pos_var});\n")
+                    script.append(f"var xsr{pos_var} = xtickLabel{pos_var}.sourceRectAtTime(0, false);\n")
+                    script.append(f"var xap{pos_var} = xtickLabel{pos_var}.property('Transform').property('Anchor Point');\n")
+                    script.append(f"xap{pos_var}.setValue([xsr{pos_var}.left + xsr{pos_var}.width/2, xsr{pos_var}.top]);\n")
                     # Opacity animation for label (constant duration or disabled)
                     if self.animate_opacity:
                         script.append(f"xtickLabel{pos_var}.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
@@ -970,7 +1163,7 @@ if (comp && comp instanceof CompItem) {
                 script.append(f"ytickShape{pos_var}.closed = false;\n")
                 script.append(f"ytickPath{pos_var}.setValue(ytickShape{pos_var});\n")
                 script.append(f"var ytickStroke{pos_var} = ytickContents{pos_var}.addProperty('ADBE Vector Graphic - Stroke');\n")
-                script.append(f"ytickStroke{pos_var}.property('ADBE Vector Stroke Color').setValue([0, 0, 0]);\n")
+                script.append(f"ytickStroke{pos_var}.property('ADBE Vector Stroke Color').setValue({color_to_js(self.ui_color)});\n")
                 script.append(f"ytickStroke{pos_var}.property('ADBE Vector Stroke Width').setValue(2);\n")
                 # Opacity animation for tick mark (constant duration or disabled)
                 if self.animate_opacity:
@@ -989,10 +1182,13 @@ if (comp && comp instanceof CompItem) {
                     script.append(f"ytickLabel{pos_var}.parent = PlotAnchor;\n")
                     script.append(f"var ytickLabelProp{pos_var} = ytickLabel{pos_var}.property('Source Text');\n")
                     script.append(f"var ytickLabelDoc{pos_var} = ytickLabelProp{pos_var}.value;\n")
-                    script.append(f"ytickLabelDoc{pos_var}.fontSize = 16;\n")
-                    script.append(f"ytickLabelDoc{pos_var}.fillColor = [0, 0, 0];\n")
+                    script.append(f"ytickLabelDoc{pos_var}.fontSize = {int(16 * self.font_scale)};\n")
+                    script.append(f"ytickLabelDoc{pos_var}.fillColor = {color_to_js(self.ui_color)};\n")
                     script.append(f"ytickLabelDoc{pos_var}.justification = ParagraphJustification.RIGHT_JUSTIFY;\n")
                     script.append(f"ytickLabelProp{pos_var}.setValue(ytickLabelDoc{pos_var});\n")
+                    script.append(f"var ysr{pos_var} = ytickLabel{pos_var}.sourceRectAtTime(0, false);\n")
+                    script.append(f"var yap{pos_var} = ytickLabel{pos_var}.property('Transform').property('Anchor Point');\n")
+                    script.append(f"yap{pos_var}.setValue([ysr{pos_var}.left + ysr{pos_var}.width, ysr{pos_var}.top + ysr{pos_var}.height/2]);\n")
                     # Opacity animation for label (constant duration or disabled)
                     if self.animate_opacity:
                         script.append(f"ytickLabel{pos_var}.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
@@ -1057,20 +1253,22 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
         # All graph elements (background, axes, grid, etc.) are drawn at the comp center
         center_x = self.comp_width / 2
         center_y = self.comp_height / 2
-        script.append(f"var bgLayer = comp.layers.addShape();\n")
-        script.append(f"bgLayer.name = 'GraphBG';\n")
-        script.append(f"var bgContents = bgLayer.property('ADBE Root Vectors Group');\n")
-        script.append(f"var bgRect = bgContents.addProperty('ADBE Vector Shape - Rect');\n")
-        script.append(f"bgRect.property('ADBE Vector Rect Size').setValue([{self.width}, {self.height}]);\n")
-        script.append(f"bgRect.property('ADBE Vector Rect Position').setValue([0, 0]);\n")
-        script.append(f"var bgFill = bgContents.addProperty('ADBE Vector Graphic - Fill');\n")
-        script.append(f"bgFill.property('ADBE Vector Fill Color').setValue({color_to_js(self.bg_color)});\n")
-        # Add stroke to background rectangle
-        script.append(f"var bgStroke = bgContents.addProperty('ADBE Vector Graphic - Stroke');\n")
-        script.append(f"bgStroke.property('ADBE Vector Stroke Color').setValue({color_to_js(self.bg_stroke_color)});\n")
-        script.append(f"bgStroke.property('ADBE Vector Stroke Width').setValue({self.bg_stroke_width});\n")
-        script.append(f"bgLayer.property('Transform').property('Position').setValue([{center_x}, {center_y}]);\n")
-        script.append(f"bgLayer.parent = PlotAnchor;\n")
+        # Optional background rectangle (skipped when bg_color == 'none')
+        if not (isinstance(self.bg_color, str) and self.bg_color.lower() == "none"):
+            script.append(f"var bgLayer = comp.layers.addShape();\n")
+            script.append(f"bgLayer.name = 'GraphBG';\n")
+            script.append(f"var bgContents = bgLayer.property('ADBE Root Vectors Group');\n")
+            script.append(f"var bgRect = bgContents.addProperty('ADBE Vector Shape - Rect');\n")
+            script.append(f"bgRect.property('ADBE Vector Rect Size').setValue([{self.width}, {self.height}]);\n")
+            script.append(f"bgRect.property('ADBE Vector Rect Position').setValue([0, 0]);\n")
+            script.append(f"var bgFill = bgContents.addProperty('ADBE Vector Graphic - Fill');\n")
+            script.append(f"bgFill.property('ADBE Vector Fill Color').setValue({color_to_js(self.bg_color)});\n")
+            # Add stroke to background rectangle
+            script.append(f"var bgStroke = bgContents.addProperty('ADBE Vector Graphic - Stroke');\n")
+            script.append(f"bgStroke.property('ADBE Vector Stroke Color').setValue({color_to_js(self.bg_stroke_color)});\n")
+            script.append(f"bgStroke.property('ADBE Vector Stroke Width').setValue({self.bg_stroke_width});\n")
+            script.append(f"bgLayer.property('Transform').property('Position').setValue([{center_x}, {center_y}]);\n")
+            script.append(f"bgLayer.parent = PlotAnchor;\n")
 
         # In _generate_jsx, calculate global data limits with NO padding
         all_x = []
@@ -1404,6 +1602,7 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
                 bar_anim_times = elem.get("bar_anim_times")
                 total_anim = elem["animate"] if elem["animate"] else 1.0
                 animate_downward = elem.get("animate_downward", False)
+                anchor_at_y_axis = elem.get("anchor_at_y_axis", False)
                 
                 # Handle bar_anim_times (individual bar duration)
                 if bar_anim_times is None:
@@ -1473,7 +1672,13 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
                     sx1, sy1 = self._data_to_shape(x1, y1, xmin_pad, xmax_pad, ymin_pad, ymax_pad)
                     bar_width = abs(sx1 - sx0)  # horizontal extent
                     bar_height = abs(sy1 - sy0)  # vertical thickness
-                    anchor_x = sx0  # left boundary (after clipping)
+                    # Anchor selection: pyramid bars anchor at y-axis; others anchor at bar start
+                    if anchor_at_y_axis:
+                        center_y_data = (bottom + top) / 2
+                        axis_sx, _ = self._data_to_shape(0, center_y_data, xmin_pad, xmax_pad, ymin_pad, ymax_pad)
+                        anchor_x = axis_sx
+                    else:
+                        anchor_x = sx0  # left boundary (after clipping)
                     anchor_y = (sy0 + sy1) / 2  # center vertically
                     position_x = center_x + anchor_x
                     position_y = center_y + anchor_y
@@ -1484,7 +1689,14 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
                     script.append(f"var barhContents{i}_{j} = barhLayer{i}_{j}.property('ADBE Root Vectors Group');\n")
                     script.append(f"var barhRect{i}_{j} = barhContents{i}_{j}.addProperty('ADBE Vector Shape - Rect');\n")
                     script.append(f"barhRect{i}_{j}.property('ADBE Vector Rect Size').setValue([{bar_width}, {bar_height}]);\n")
-                    script.append(f"barhRect{i}_{j}.property('ADBE Vector Rect Position').setValue([{bar_width/2}, 0]);\n")
+                    # Position rectangle so scaling originates at anchor
+                    if anchor_at_y_axis:
+                        if width >= 0:
+                            script.append(f"barhRect{i}_{j}.property('ADBE Vector Rect Position').setValue([{bar_width/2}, 0]);\n")
+                        else:
+                            script.append(f"barhRect{i}_{j}.property('ADBE Vector Rect Position').setValue([{-bar_width/2}, 0]);\n")
+                    else:
+                        script.append(f"barhRect{i}_{j}.property('ADBE Vector Rect Position').setValue([{bar_width/2}, 0]);\n")
                     script.append(f"var barhFill{i}_{j} = barhContents{i}_{j}.addProperty('ADBE Vector Graphic - Fill');\n")
                     script.append(f"barhFill{i}_{j}.property('ADBE Vector Fill Color').setValue({bar_color_js});\n")
                     script.append(f"barhFill{i}_{j}.property('ADBE Vector Fill Opacity').setValue({int(alpha*100)});\n")
@@ -1581,8 +1793,8 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
                 script.append(f"legendLabel{i}.parent = PlotAnchor;\n")
                 script.append(f"var legendLabelProp{i} = legendLabel{i}.property('Source Text');\n")
                 script.append(f"var legendLabelDoc{i} = legendLabelProp{i}.value;\n")
-                script.append(f"legendLabelDoc{i}.fontSize = 24;\n")
-                script.append(f"legendLabelDoc{i}.fillColor = [0, 0, 0];\n")
+                script.append(f"legendLabelDoc{i}.fontSize = {int(24 * self.font_scale)};\n")
+                script.append(f"legendLabelDoc{i}.fillColor = {color_to_js(self.ui_color)};\n")
                 script.append(f"legendLabelDoc{i}.justification = ParagraphJustification.LEFT_JUSTIFY;\n")
                 script.append(f"legendLabelProp{i}.setValue(legendLabelDoc{i});\n")
                 # Fade-in animation for label
@@ -1604,10 +1816,14 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
             script.append(f"titleLayer.parent = PlotAnchor;\n")
             script.append("var titleProp = titleLayer.property('Source Text');\n")
             script.append("var titleDoc = titleProp.value;\n")
-            script.append("titleDoc.fontSize = 48;\n")
-            script.append("titleDoc.fillColor = [0, 0, 0];\n")
+            script.append(f"titleDoc.fontSize = {int(48 * self.font_scale)};\n")
+            script.append(f"titleDoc.fillColor = {color_to_js(self.ui_color)};\n")
             script.append("titleDoc.justification = ParagraphJustification.CENTER_JUSTIFY;\n")
             script.append("titleProp.setValue(titleDoc);\n")
+            # Anchor the title to top-center so its top edge aligns precisely
+            script.append("var titleSR = titleLayer.sourceRectAtTime(0, false);\n")
+            script.append("var titleAP = titleLayer.property('Transform').property('Anchor Point');\n")
+            script.append("titleAP.setValue([titleSR.left + titleSR.width/2, titleSR.top]);\n")
             
             # Animate title
             if self.animate_opacity:
@@ -1636,10 +1852,13 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
             script.append(f"xlabelLayer.parent = PlotAnchor;\n")
             script.append("var xlabelProp = xlabelLayer.property('Source Text');\n")
             script.append("var xlabelDoc = xlabelProp.value;\n")
-            script.append("xlabelDoc.fontSize = 24;\n")
-            script.append("xlabelDoc.fillColor = [0, 0, 0];\n")
+            script.append(f"xlabelDoc.fontSize = {int(24 * self.font_scale)};\n")
+            script.append(f"xlabelDoc.fillColor = {color_to_js(self.ui_color)};\n")
             script.append("xlabelDoc.justification = ParagraphJustification.CENTER_JUSTIFY;\n")
             script.append("xlabelProp.setValue(xlabelDoc);\n")
+            script.append("var xlabelSR = xlabelLayer.sourceRectAtTime(0, false);\n")
+            script.append("var xlabelAP = xlabelLayer.property('Transform').property('Anchor Point');\n")
+            script.append("xlabelAP.setValue([xlabelSR.left + xlabelSR.width/2, xlabelSR.top]);\n")
             
             # Animate xlabel
             if self.animate_opacity:
@@ -1667,8 +1886,8 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
             script.append("ylabelLayer.property('Transform').property('Rotation').setValue(-90);\n")
             script.append("var ylabelProp = ylabelLayer.property('Source Text');\n")
             script.append("var ylabelDoc = ylabelProp.value;\n")
-            script.append("ylabelDoc.fontSize = 24;\n")
-            script.append("ylabelDoc.fillColor = [0, 0, 0];\n")
+            script.append(f"ylabelDoc.fontSize = {int(24 * self.font_scale)};\n")
+            script.append(f"ylabelDoc.fillColor = {color_to_js(self.ui_color)};\n")
             script.append("ylabelDoc.justification = ParagraphJustification.CENTER_JUSTIFY;\n")
             script.append("ylabelProp.setValue(ylabelDoc);\n")
             
@@ -1714,9 +1933,9 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
                 # Set text properties
                 script.append(f"var annotationProp{annotation_count} = annotationLayer{annotation_count}.property('Source Text');\n")
                 script.append(f"var annotationDoc{annotation_count} = annotationProp{annotation_count}.value;\n")
-                script.append(f"annotationDoc{annotation_count}.fontSize = {elem['fontsize']};\n")
+                script.append(f"annotationDoc{annotation_count}.fontSize = {int(elem['fontsize'] * self.font_scale)};\n")
                 script.append(f"annotationDoc{annotation_count}.font = \"{elem['font']}\";\n")
-                script.append(f"annotationDoc{annotation_count}.fillColor = [0, 0, 0];\n")
+                script.append(f"annotationDoc{annotation_count}.fillColor = {color_to_js(self.ui_color)};\n")
                 script.append(f"annotationDoc{annotation_count}.justification = {justification};\n")
                 script.append(f"annotationProp{annotation_count}.setValue(annotationDoc{annotation_count});\n")
                 

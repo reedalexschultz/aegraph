@@ -1,20 +1,20 @@
-# AEGraph 📊✨
+# AEGraph
 
 **A matplotlib-inspired Python library for creating animated graphs in Adobe After Effects**
 
 AEGraph brings the power of data visualization to After Effects, allowing you to create professional, animated charts and graphs with cinematic effects. Whether you're creating data presentations, educational content, or motion graphics, AEGraph makes it easy to transform your data into stunning visualizations.
 
-## ✨ Key Features
+## Key Features
 
-- 🎬 **Native After Effects Integration** - Generates JSX scripts that run directly in AE
-- 📈 **Multiple Plot Types** - Line plots, scatter plots, histograms, and bar charts
-- 🎨 **Rich Customization** - Colors, gradients, drop shadows, and cinematic effects
-- 🎯 **Smart Animation** - Easy ease interpolation, sequential animations, and trim paths
-- 📐 **Automatic Layout** - Axes, ticks, grid lines, and coordinate mapping
-- 🎭 **Professional Effects** - Vignette, wiggle, and turbulent displace effects
-- 🐍 **Pandas Support** - Direct integration with pandas DataFrames and Series
+- **Native After Effects Integration** - Generates JSX scripts that run directly in AE
+- **Multiple Plot Types** - Line plots, scatter plots, histograms, and bar charts
+- **Rich Customization** - Colors, gradients, drop shadows, and cinematic effects
+- **Smart Animation** - Easy ease interpolation, sequential animations, and trim paths
+- **Automatic Layout** - Axes, ticks, grid lines, and coordinate mapping
+- **Professional Effects** - Vignette, wiggle, and turbulent displace effects
+- **Pandas Support** - Direct integration with pandas DataFrames and Series
 
-## 🚀 Quick Start
+## Quick Start
 
 ```python
 from aegraph import AEGraph
@@ -37,14 +37,14 @@ plot = (AEGraph(width = 1280, height = 720, compwidth=1920, compheight=1080, dro
 plot.render()
 ```
 
-## 📋 Installation Requirements
+## Installation Requirements
 
 - **Python 3.7+** with NumPy
 - **Adobe After Effects** (2020 or later)
 - **macOS** (for automatic rendering via AppleScript)
 - **Pandas** (optional, for DataFrame support)
 
-## 🏗️ Class Constructor
+## Class Constructor
 
 ### `AEGraph()`
 
@@ -81,7 +81,7 @@ graph = AEGraph(
 )
 ```
 
-## 📊 Plot Types
+## Plot Types
 
 ### `plot()` - Line Plots
 
@@ -213,6 +213,112 @@ graph = (AEGraph()
          .set_xticks(x_pos, months))
 ```
 
+### `add_population_pyramid()` - Population Pyramids
+
+Create animated mirrored horizontal bar charts (population pyramids) showing age/sex distribution.
+
+```python
+add_population_pyramid(
+    csv_path=None,              # Path to CSV with columns: age, male, female
+    ages=None,                  # List of age group labels
+    male=None,                  # Male population values
+    female=None,                # Female population values
+    mode="percent",             # "percent" (% of total) or "counts" (raw values)
+    animate=5.0,                # Total animation duration in seconds
+    bar_duration=1.0,           # Duration each individual bar takes to animate
+    animate_downward=True,      # Animate bars from top to bottom
+    show_grid=True,             # Show vertical grid lines
+    color_male=[73, 118, 222],  # Male bar color (name or RGB list)
+    color_female=[168, 61, 104],# Female bar color (name or RGB list)
+    label_male="Male",          # Legend label for male bars (False to hide)
+    label_female="Female",      # Legend label for female bars (False to hide)
+    drop_shadow=None            # Drop shadow on bars (None inherits global setting)
+)
+```
+
+**Parameters:**
+- `csv_path`: Path to a CSV file with three columns (age, male, female). Use this **or** pass arrays directly.
+- `ages, male, female`: Arrays of age labels and population values (alternative to `csv_path`)
+- `mode`: `"percent"` computes each age group's share of total population; `"counts"` uses raw numbers
+- `animate` / `bar_duration`: Control overall and per-bar animation timing
+- `animate_downward`: When `True`, bars animate sequentially from oldest to youngest age group
+- `color_male` / `color_female`: Accept color names (`"blue"`) or RGB lists (`[73, 118, 222]`)
+- `label_male` / `label_female`: Set to `False` to suppress legend entries
+
+**Example — from a CSV file:**
+```python
+import numpy as np
+
+graph = (AEGraph(
+    width=800,
+    height=1500,
+    compwidth=1500,
+    compheight=1920,
+    drop_shadow=True,
+    fps=60,
+    bg_color="none",
+    ui_color="black",
+    font_scale=1.7,
+).add_population_pyramid(
+    csv_path="data/us/United-States-2024.csv",
+    mode="percent",
+    animate=1,
+    bar_duration=0.5,
+    animate_downward=True,
+    drop_shadow=True,
+    color_female=[224, 76, 157],
+    color_male=[73, 118, 222],
+    show_grid=False,
+)
+.set_xlabel("United States")
+.set_xticks([-6, -4, -2, 0, 2, 4, 6])
+.set_xlim(-6, 6)
+.render())
+```
+
+**Example — passing arrays directly:**
+```python
+import pandas as pd
+import numpy as np
+
+df = pd.read_csv("data/Bhutan-2024.csv")
+ages = df["Age"].astype(str).tolist()
+male = df["M"].astype(float).values
+female = df["F"].astype(float).values
+y_positions = np.arange(len(ages))
+
+graph = (AEGraph(
+    width=800,
+    height=1500,
+    compwidth=1500,
+    compheight=1920,
+    drop_shadow=True,
+    fps=60,
+    bg_color="none",
+    ui_color="black",
+    font_scale=1.7,
+).add_population_pyramid(
+    ages=ages,
+    male=male,
+    female=female,
+    mode="percent",
+    animate=1,
+    bar_duration=0.5,
+    animate_downward=True,
+    drop_shadow=True,
+    label_male=False,
+    label_female=False,
+    color_female=[224, 76, 157],
+    color_male=[73, 118, 222],
+    show_grid=False,
+)
+.set_xlabel("Bhutan")
+.set_yticks(positions=y_positions, labels=ages)
+.set_xticks([-6, -4, -2, 0, 2, 4, 6])
+.set_xlim(-6, 6)
+.render())
+```
+
 ### `gradient()` - Color Gradients
 
 Apply color gradients to the most recently added histogram or bar chart.
@@ -238,7 +344,7 @@ graph = (AEGraph()
          .set_xticks(range(len(categories)), categories))
 ```
 
-## 🎨 Styling & Customization
+## Styling & Customization
 
 ### Labels and Titles
 
@@ -286,7 +392,7 @@ graph.grid(show=False)
 graph.set_tick_labels(show=False)
 ```
 
-## 🎬 Animation & Effects
+## Animation & Effects
 
 ### Easy Ease Animation
 
@@ -338,7 +444,7 @@ custom_times = [0.1, 0.2, 0.15, 0.3, 0.1]  # Per-point durations
 graph.scatter(x, y, bar_anim_times=custom_times)
 ```
 
-## 🎨 Color System
+## Color System
 
 AEGraph includes a comprehensive color system with named colors:
 
@@ -359,7 +465,7 @@ AEGraph includes a comprehensive color system with named colors:
 graph.plot(x, y, color=[51, 153, 204])
 ```
 
-## 💾 Saving & Rendering
+## Saving & Rendering
 
 ### Save JSX Script
 
@@ -385,7 +491,7 @@ graph.render(ae_version="Adobe After Effects 2024", folder_path="./ae_scripts/")
 graph.reset_comp()
 ```
 
-## 📊 Advanced Examples
+## Advanced Examples
 
 ### Multi-Dataset Comparison
 
@@ -440,6 +546,57 @@ graph = (AEGraph(comp_width=1920, comp_height=1080, width=1280, height = 720,
 graph.render()
 ```
 
+### Population Pyramid — Multiple Countries
+
+```python
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+folder = Path("data/developing-africa")
+files = sorted(folder.glob("*.csv"))
+
+for file in files:
+    df = pd.read_csv(file)
+    ages = df["Age"].astype(str).tolist()
+    male = df["M"].astype(float).values
+    female = df["F"].astype(float).values
+    y_positions = np.arange(len(ages))
+    country = file.stem.removesuffix("-2024")
+
+    (AEGraph(
+        width=800,
+        height=1500,
+        compwidth=1500,
+        compheight=1920,
+        comp_name=country,
+        drop_shadow=True,
+        fps=60,
+        bg_color="none",
+        ui_color="black",
+        font_scale=1.7,
+    ).add_population_pyramid(
+        ages=ages,
+        male=male,
+        female=female,
+        mode="percent",
+        animate=1,
+        bar_duration=0.5,
+        animate_downward=True,
+        drop_shadow=True,
+        label_male=False,
+        label_female=False,
+        color_female=[224, 76, 157],
+        color_male=[73, 118, 222],
+        show_grid=False,
+    )
+    .set_xlabel(country)
+    .set_yticks(positions=y_positions, labels=ages)
+    .set_xticks([-6, -4, -2, 0, 2, 4, 6])
+    .set_xlim(-6, 6)
+    .render())
+```
+
 ### Scientific Data with Custom Styling
 
 ```python
@@ -464,7 +621,7 @@ graph = (AEGraph(comp_width=1920, comp_height=1080, width=1280, height = 720,
 graph.render()
 ```
 
-## 🔧 Technical Details
+## Technical Details
 
 ### Coordinate System
 - **Data coordinates**: Your input data values
@@ -476,13 +633,9 @@ graph.render()
 - **Trim Paths**: Line plots animate by revealing the path
 - **Scale Animation**: Scatter points scale from 0 to 100%
 - **Sequential Timing**: Multiple elements animate in sequence
-- **Easy Ease**: Professional bezier curve interpolation
+- **Easy Ease**: Bezier curve interpolation
 
-### Performance Tips
-- Use pastel colors (`p_*`) for better visual appeal
-- Set appropriate `animate` durations (1-5 seconds typically work well)
-
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -508,12 +661,10 @@ graph.render()
 
 - Always call methods in a chained fashion for readability
 
-## 📄 License
+## License
 
 AEGraph is released under the MIT License. Feel free to use it in personal and commercial projects.
 
 ---
 
-**Happy graphing! 📊✨**
-
-*Transform your data into cinematic visualizations with AEGraph.*
+**Happy graphing!**
