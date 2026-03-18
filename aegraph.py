@@ -1,6 +1,7 @@
 import datetime
 import numpy as np
 from typing import List, Tuple, Optional, Union
+import csv
 import math
 try:
     import pandas as pd
@@ -54,13 +55,23 @@ DEFAULT_DROP_SHADOW = {
 
 
 def color_to_js(color: Union[str, List[float], Tuple[float, float, float]]) -> str:
-    """Convert color name or RGB list/tuple to JS array string."""
+    """Convert color name or RGB list/tuple to AE-friendly JS array [r,g,b].
+
+    Accepts:
+    - Named colors from COLOR_NAMES (0–1 floats)
+    - RGB lists/tuples either in 0–1 floats or 0–255 ints
+    """
     if isinstance(color, str):
         rgb = COLOR_NAMES.get(color.lower())
         if rgb is None:
             raise ValueError(f"Unknown color name: {color}")
     elif isinstance(color, (list, tuple)) and len(color) == 3:
-        rgb = color
+        rgb = list(color)
+        # Auto-normalize 0–255 integers to 0–1 floats for AE
+        if max(rgb) > 1:
+            rgb = [float(v) / 255.0 for v in rgb]
+        else:
+            rgb = [float(v) for v in rgb]
     else:
         raise ValueError("Color must be a name or 3-value RGB list/tuple.")
     return f"[{rgb[0]}, {rgb[1]}, {rgb[2]}]"
@@ -128,6 +139,10 @@ class AEGraph:
                  easy_ease=True,
                  ease_speed=00,
                  ease_influence=33,
+                 animate_opacity=True,
+                 animate_axes=True,
+                 ui_color: Union[str, List[float], Tuple[float, float, float]] = "black",
+                 font_scale: float = 1.0,
                  bg_stroke_width = 0,
                  bg_stroke_color = [0.15, 0.15, 0.15],
                  fps=24):
@@ -137,7 +152,8 @@ class AEGraph:
             width (int): Graph logical width (default: 1920)
             height (int): Graph logical height (default: 1080)
             comp_name (str): Name of the AE composition (default: "AEGraph_Comp")
-            bg_color (str or list): Background color name or RGB list (default: "white")
+            bg_color (str or list): Background color name or RGB list (default: "white").
+                Pass "none" to omit the background rectangle entirely.
             comp_width/compheight/compwidth/compheight (int, optional): AE composition width/height (default: width/height)
             position (tuple, optional): (x, y) center of graph in comp coordinates (default: comp center)
             show_all_points (bool): Whether to plot all points or only those within bounds (default: False)
@@ -148,6 +164,11 @@ class AEGraph:
             ease_speed (int): Easy ease speed percentage (default: 00)
             ease_influence (int): Easy ease influence percentage (default: 33)
             fps (int): Frame rate for the After Effects composition (default: 24)
+            ui_color (str or list/tuple): Color for all non-data UI elements like axes, tick marks,
+                all tick/label/title/legend/annotation text (default: "black"). Accepts named colors
+                from COLOR_NAMES or RGB values in 0–1 floats or 0–255 ints.
+            font_scale (float): Global scale multiplier for all text sizes (ticks, labels, title,
+                legend, and annotations). Default 1.0.
         """
         self.width = width
         self.height = height
@@ -187,9 +208,15 @@ class AEGraph:
         self.easy_ease = easy_ease  # Whether to apply easy ease to all animation keyframes
         self.ease_speed = ease_speed  # Easy ease speed percentage
         self.ease_influence = ease_influence  # Easy ease influence percentage
+        self.animate_opacity = animate_opacity  # Enable/disable opacity fade animations
+        self.animate_axes = animate_axes  # Enable/disable Trim Paths animation for axes
         self.fps = fps  # Frame rate for the After Effects composition
         self.bg_stroke_color = bg_stroke_color
         self.bg_stroke_width = bg_stroke_width
+        self.ui_color = ui_color
+        self.font_scale = float(font_scale) if font_scale is not None else 1.0
+        # Tick formatting flags
+        self.percent_tick_labels = False  # When True, x-ticks render as absolute percentages
 
     def _filter_points(self, x, y):
         """
@@ -404,18 +431,254 @@ class AEGraph:
             self.legend.append(label)
         return self
 
+    def barh(self, y_values, widths, bar_height=None, color="p_blue", label=None, delay=0.0, alpha=0.8, animate=1.0, drop_shadow=False, bar_duration=None, bar_anim_times=None, animate_downward: bool = False, anchor_at_y_axis: bool = False, **kwargs):
+        """
+        Add a horizontal bar graph to the plot (similar to matplotlib's barh).
+        
+        y_values: 1D array-like y positions for bars (vertical positions).
+        widths: 1D array-like widths for bars (horizontal lengths, must match length of y_values).
+        bar_height: Height (thickness) of each bar in data coordinates. If None, auto-calculated from spacing.
+        color: Bar color.
+        label: Legend label.
+        alpha: Bar opacity (0-1).
+        animate: Total animation duration in seconds (all bars complete within this time).
+        drop_shadow: Whether to add drop shadow effect.
+        bar_duration: Duration for each individual bar animation in seconds. If None, bars animate 
+                      sequentially without overlap (each gets animate/n_bars seconds). If specified,
+                      bars will overlap - e.g., animate=5.0 with bar_duration=1.0 creates smooth 
+                      overlapping animations where each bar takes 1 second but spreads over 5 seconds total.
+        bar_anim_times: (Deprecated, use bar_duration) Optional list of per-bar animation durations.
+        animate_downward (bool): If True, bars animate from top y to bottom y
+                     (downward). Default animates bottom-to-top.
+        
+        Example:
+            # Smooth overlapping animations
+            plot = AEGraph().barh(y_positions, values, animate=5.0, bar_duration=1.0)
+            
+            # Sequential animations (no overlap)
+            plot = AEGraph().barh(y_positions, values, animate=5.0)
+        """
+        # Support pandas Series
+        if pd is not None:
+            if isinstance(y_values, pd.Series):
+                y_values = y_values.values
+            if isinstance(widths, pd.Series):
+                widths = widths.values
+        
+        y_values = np.asarray(y_values)
+        widths = np.asarray(widths)
+        
+        if len(y_values) != len(widths):
+            raise ValueError("y_values and widths must have the same length")
+        
+        # Auto-calculate bar height if not specified
+        if bar_height is None:
+            if len(y_values) > 1:
+                # Use 80% of the minimum spacing between consecutive y values
+                spacings = np.diff(np.sort(y_values))
+                min_spacing = np.min(spacings[spacings > 0]) if len(spacings) > 0 and np.any(spacings > 0) else 1.0
+                bar_height = 0.8 * min_spacing
+            else:
+                bar_height = 1.0  # Default for single bar
+        
+        # Calculate bin edges for each bar (bottom and top edges)
+        half_height = bar_height / 2
+        bin_bottom = y_values - half_height
+        bin_top = y_values + half_height
+        bin_centers = y_values.copy()  # y_values are already the centers
+        
+        # Use bar_duration if specified, otherwise fall back to bar_anim_times
+        if bar_duration is not None:
+            bar_anim_times = bar_duration
+        
+        self.elements.append({
+            "type": "barh",
+            "bin_bottom": list(bin_bottom),
+            "bin_top": list(bin_top),
+            "bin_centers": list(bin_centers),
+            "widths": list(widths),
+            "color": color,
+            "label": label,
+            "alpha": alpha,
+            "animate": animate,
+            "drop_shadow": drop_shadow,
+            "bar_anim_times": bar_anim_times,
+            "animate_downward": animate_downward,
+            "anchor_at_y_axis": anchor_at_y_axis,
+            "delay": delay,
+            **kwargs
+        })
+        if label:
+            self.legend.append(label)
+        return self
+
+    def add_population_pyramid(self,
+                               csv_path: Optional[str] = None,
+                               ages: Optional[List[str]] = None,
+                               male: Optional[List[float]] = None,
+                               female: Optional[List[float]] = None,
+                               mode: str = "percent",
+                               animate: float = 5.0,
+                               bar_duration: Optional[float] = 1.0,
+                               animate_downward: bool = True,
+                               show_grid: bool = True,
+                               color_male: Union[str, List[float], Tuple[float, float, float]] = [73, 118, 222],
+                               color_female: Union[str, List[float], Tuple[float, float, float]] = [168, 61, 104],
+                               label_male: Optional[str] = "Male",
+                               label_female: Optional[str] = "Female",
+                               drop_shadow: Optional[bool] = None,
+                               ):
+        """
+        Add a mirrored horizontal bar chart (population pyramid) to the current graph.
+
+        Provide either `csv_path` to a file with three columns (age, male, female)
+        or pass `ages`, `male`, and `female` arrays directly.
+
+        mode: 'percent' to compute per-age-group share of total population (%),
+              'counts' to use raw counts (auto-scaled if very large).
+
+        Returns self for chaining.
+
+        drop_shadow:
+            - If True, apply the same Drop Shadow effect used for axes to the pyramid bars.
+            - If False, do not add drop shadows to bars.
+            - If None (default), inherit from the global `self.drop_shadow` setting.
+        """
+        # Load data
+        if csv_path is not None:
+            df = None
+            if pd is not None:
+                # Try common separators
+                for sep, kwargs in [("\t", {}), (",", {}), (None, {"delim_whitespace": True})]:
+                    try:
+                        dft = pd.read_csv(csv_path, sep=sep, header=None, **kwargs)
+                        if dft.shape[1] >= 3:
+                            df = dft.iloc[:, :3]
+                            df.columns = ["age", "male", "female"]
+                            break
+                    except Exception:
+                        continue
+            if df is None:
+                # Fallback to csv module
+                rows = []
+                with open(csv_path, "r", newline="") as f:
+                    content = f.read().strip().splitlines()
+                for line in content:
+                    if not line.strip():
+                        continue
+                    # Try tab, comma, then whitespace split
+                    for delim in ["\t", ","]:
+                        if delim in line:
+                            parts = [p.strip() for p in line.split(delim)]
+                            break
+                    else:
+                        parts = line.split()
+                    if len(parts) < 3:
+                        continue
+                    rows.append((parts[0], float(parts[1]), float(parts[2])))
+                ages = [r[0] for r in rows]
+                male = [r[1] for r in rows]
+                female = [r[2] for r in rows]
+            else:
+                ages = df["age"].astype(str).tolist()
+                male = df["male"].astype(float).tolist()
+                female = df["female"].astype(float).tolist()
+        else:
+            if ages is None or male is None or female is None:
+                raise ValueError("Provide either csv_path or ages/male/female arrays.")
+
+        # Convert to numpy arrays
+        male_arr = np.asarray(male, dtype=float)
+        female_arr = np.asarray(female, dtype=float)
+        n = len(ages)
+        y_positions = np.arange(n)
+
+        # Compute widths
+        if mode == "counts":
+            # Scale down if extremely large to keep x-range manageable
+            max_val = float(max(np.max(male_arr), np.max(female_arr)))
+            scale = 1.0
+            if max_val > 1_000_000:
+                scale = 1_000.0
+            male_w = -male_arr / scale
+            female_w = female_arr / scale
+            xlabel = "Population (scaled)"
+        else:
+            total = float(male_arr.sum() + female_arr.sum())
+            if total <= 0:
+                raise ValueError("Total population is zero; cannot compute percentages")
+            male_pct = (male_arr / total) * 100.0
+            female_pct = (female_arr / total) * 100.0
+            male_w = -male_pct
+            female_w = female_pct
+            xlabel = "Population (%)"
+
+        # Symmetric limits
+        max_abs = float(max(np.max(np.abs(male_w)), np.max(np.abs(female_w))))
+        xpad = max_abs * 0.1
+        xmin, xmax = -(max_abs + xpad), (max_abs + xpad)
+
+        # Determine whether to add drop shadow to bars
+        bar_shadow = self.drop_shadow if drop_shadow is None else bool(drop_shadow)
+
+        # Add bars
+        self.barh(
+            y_positions,
+            male_w,
+            animate=animate,
+            bar_duration=bar_duration,
+            alpha=0.9,
+            color=color_male,
+            label=label_male,
+            animate_downward=animate_downward,
+            anchor_at_y_axis=True,
+            drop_shadow=bar_shadow,
+        )
+        self.barh(
+            y_positions,
+            female_w,
+            animate=animate,
+            bar_duration=bar_duration,
+            alpha=0.9,
+            color=color_female,
+            label=label_female,
+            animate_downward=animate_downward,
+            anchor_at_y_axis=True,
+            drop_shadow=bar_shadow,
+        )
+
+        # Axes and labels
+        self.set_xlabel(xlabel)
+        self.set_yticks(positions=y_positions, labels=ages)
+        self.set_xlim(xmin, xmax)
+        # Ensure percent tick labels by default for pyramids in percent mode
+        if mode == "percent":
+            self.percent_tick_labels = True
+        # Format x-ticks as absolute percent labels for population pyramids
+        positions = self._nice_ticks(xmin, xmax, nticks=7)
+        step = positions[1] - positions[0] if len(positions) > 1 else 1.0
+        if abs(step) < 1:
+            labels = [f"{abs(p):.1f}%" for p in positions]
+        else:
+            labels = [f"{abs(p):.0f}%" for p in positions]
+        self.set_xticks(positions=positions, labels=labels)
+        if show_grid:
+            self.grid(show=True, color="lightgray", alpha=0.25)
+
+        return self
+
     def gradient(self, color_start, color_end):
         """
-        Apply a color gradient to the most recently added histogram or bar_graph.
+        Apply a color gradient to the most recently added histogram, bar_graph, or barh.
         Supports named colors, 0–1 floats, or 0–255 ints.
         """
         if not self.elements:
-            raise ValueError("No elements to apply gradient to. Add a histogram or bar_graph first.")
+            raise ValueError("No elements to apply gradient to. Add a histogram, bar_graph, or barh first.")
 
         # Get the last element
         last_elem = self.elements[-1]
-        if last_elem["type"] not in ["histogram", "bar_graph"]:
-            raise ValueError("Gradient can only be applied to histogram or bar_graph elements.")
+        if last_elem["type"] not in ["histogram", "bar_graph", "barh"]:
+            raise ValueError("Gradient can only be applied to histogram, bar_graph, or barh elements.")
 
         def normalize_color(c):
             if isinstance(c, str):
@@ -435,7 +698,10 @@ class AEGraph:
         end_rgb = normalize_color(color_end)
 
         # Calculate number of bars
-        n_bars = len(last_elem["heights"])
+        if last_elem["type"] == "barh":
+            n_bars = len(last_elem["widths"])
+        else:
+            n_bars = len(last_elem["heights"])
         if n_bars <= 1:
             last_elem["gradient_colors"] = [start_rgb]
         else:
@@ -529,6 +795,9 @@ class AEGraph:
                     all_x.extend(elem.get("bin_left", []))
                     all_x.extend(elem.get("bin_right", []))
                     all_x.extend(elem.get("bin_centers", []))
+                elif elem["type"] == "barh":
+                    all_x.extend(elem.get("widths", []))
+                    all_x.append(0)  # include baseline
             if not all_x:
                 all_x = [0, 1]  # fallback if nothing plotted
 
@@ -544,7 +813,14 @@ class AEGraph:
             positions = self._nice_ticks(xmin, xmax, nticks)
 
         if labels is None:
-            labels = [str(pos) for pos in positions]
+            if self.percent_tick_labels:
+                step = positions[1] - positions[0] if len(positions) > 1 else 1.0
+                if abs(step) < 1:
+                    labels = [f"{abs(pos):.1f}%" for pos in positions]
+                else:
+                    labels = [f"{abs(pos):.0f}%" for pos in positions]
+            else:
+                labels = [str(pos) for pos in positions]
 
         self.xticks = list(zip(positions, labels))
         return self
@@ -561,6 +837,10 @@ class AEGraph:
                     all_y.extend(elem.get("y", []))
                 elif elem["type"] in ["histogram", "bar_graph"]:
                     all_y.extend(elem.get("heights", []))
+                elif elem["type"] == "barh":
+                    all_y.extend(elem.get("bin_bottom", []))
+                    all_y.extend(elem.get("bin_top", []))
+                    all_y.extend(elem.get("bin_centers", []))
             if not all_y:
                 all_y = [0, 1]  # fallback if nothing plotted
 
@@ -730,11 +1010,15 @@ if (comp && comp instanceof CompItem) {
         
         return "".join(jsx)
 
-    def _generate_axes_jsx(self, script, center_x, center_y, xmin_pad, xmax_pad, ymin_pad, ymax_pad, ANIM_DURATION):
+    def _generate_axes_jsx(self, script, center_x, center_y, xmin_pad, xmax_pad, ymin_pad, ymax_pad, ANIM_DURATION, has_barh=False):
         """Helper function to generate axes and ticks JSX code."""
         # Axes: y-axis at x=0 if in range, else at left; x-axis at y=0 if in range, else at bottom
+        # For barh charts, always put x-axis at bottom (ymin_pad) so it doesn't intersect bars
         y_axis_x = 0 if xmin_pad <= 0 <= xmax_pad else xmin_pad
-        x_axis_y = 0 if ymin_pad <= 0 <= ymax_pad else ymin_pad
+        if has_barh:
+            x_axis_y = ymin_pad  # Always at bottom for horizontal bar charts
+        else:
+            x_axis_y = 0 if ymin_pad <= 0 <= ymax_pad else ymin_pad
         # Clamp axis reference values to visible range for tick placement
         y_axis_x = min(max(y_axis_x, xmin_pad), xmax_pad)
         x_axis_y = min(max(x_axis_y, ymin_pad), ymax_pad)
@@ -761,17 +1045,18 @@ if (comp && comp instanceof CompItem) {
         script.append("axesShape.closed = false;\n")
         script.append("axesPath.setValue(axesShape);\n")
         script.append("var axesStroke = axesContents.addProperty('ADBE Vector Graphic - Stroke');\n")
-        script.append("axesStroke.property('ADBE Vector Stroke Color').setValue([0, 0, 0]);\n")
+        script.append(f"axesStroke.property('ADBE Vector Stroke Color').setValue({color_to_js(self.ui_color)});\n")
         script.append("axesStroke.property('ADBE Vector Stroke Width').setValue(3);\n")
         script.append("axesStroke.property('ADBE Vector Stroke Opacity').setValue(100);\n")
-        # Animate axes with Trim Paths
-        script.append("var axesTrim = axesContents.addProperty('ADBE Vector Filter - Trim');\n")
-        script.append(f"var axesTrimEnd = axesTrim.property('ADBE Vector Trim End');\n")
-        script.append(f"axesTrimEnd.setValueAtTime(0, 0);\n")
-        script.append(f"axesTrimEnd.setValueAtTime({ANIM_DURATION}, 100);\n")
-        # Apply easy ease to axes trim path keyframes
-        if self.easy_ease:
-            script.append(f"applyEasyEase(axesTrimEnd, {self.ease_speed}, {self.ease_influence});\n")
+        # Animate axes with Trim Paths (optional)
+        if self.animate_axes:
+            script.append("var axesTrim = axesContents.addProperty('ADBE Vector Filter - Trim');\n")
+            script.append(f"var axesTrimEnd = axesTrim.property('ADBE Vector Trim End');\n")
+            script.append(f"axesTrimEnd.setValueAtTime(0, 0);\n")
+            script.append(f"axesTrimEnd.setValueAtTime({ANIM_DURATION}, 100);\n")
+            # Apply easy ease to axes trim path keyframes
+            if self.easy_ease:
+                script.append(f"applyEasyEase(axesTrimEnd, {self.ease_speed}, {self.ease_influence});\n")
         # Y axis
         script.append("var yAxisLayer = comp.layers.addShape();\n")
         script.append("yAxisLayer.name = \"Y-Axis\";\n")
@@ -785,17 +1070,18 @@ if (comp && comp instanceof CompItem) {
         script.append("yAxisShape.closed = false;\n")
         script.append("yAxisPath.setValue(yAxisShape);\n")
         script.append("var yAxisStroke = yAxisContents.addProperty('ADBE Vector Graphic - Stroke');\n")
-        script.append("yAxisStroke.property('ADBE Vector Stroke Color').setValue([0, 0, 0]);\n")
+        script.append(f"yAxisStroke.property('ADBE Vector Stroke Color').setValue({color_to_js(self.ui_color)});\n")
         script.append("yAxisStroke.property('ADBE Vector Stroke Width').setValue(3);\n")
         script.append("yAxisStroke.property('ADBE Vector Stroke Opacity').setValue(100);\n")
-        # Animate y axis with Trim Paths
-        script.append("var yAxisTrim = yAxisContents.addProperty('ADBE Vector Filter - Trim');\n")
-        script.append(f"var yAxisTrimEnd = yAxisTrim.property('ADBE Vector Trim End');\n")
-        script.append(f"yAxisTrimEnd.setValueAtTime(0, 0);\n")
-        script.append(f"yAxisTrimEnd.setValueAtTime({ANIM_DURATION}, 100);\n")
-        # Apply easy ease to Y axis trim path keyframes
-        if self.easy_ease:
-            script.append(f"applyEasyEase(yAxisTrimEnd, {self.ease_speed}, {self.ease_influence});\n")
+        # Animate y axis with Trim Paths (optional)
+        if self.animate_axes:
+            script.append("var yAxisTrim = yAxisContents.addProperty('ADBE Vector Filter - Trim');\n")
+            script.append(f"var yAxisTrimEnd = yAxisTrim.property('ADBE Vector Trim End');\n")
+            script.append(f"yAxisTrimEnd.setValueAtTime(0, 0);\n")
+            script.append(f"yAxisTrimEnd.setValueAtTime({ANIM_DURATION}, 100);\n")
+            # Apply easy ease to Y axis trim path keyframes
+            if self.easy_ease:
+                script.append(f"applyEasyEase(yAxisTrimEnd, {self.ease_speed}, {self.ease_influence});\n")
         
         # Add drop shadow to axes if specified
         if self.drop_shadow:
@@ -823,14 +1109,16 @@ if (comp && comp instanceof CompItem) {
                 script.append(f"xtickShape{pos_var}.closed = false;\n")
                 script.append(f"xtickPath{pos_var}.setValue(xtickShape{pos_var});\n")
                 script.append(f"var xtickStroke{pos_var} = xtickContents{pos_var}.addProperty('ADBE Vector Graphic - Stroke');\n")
-                script.append(f"xtickStroke{pos_var}.property('ADBE Vector Stroke Color').setValue([0, 0, 0]);\n")
+                script.append(f"xtickStroke{pos_var}.property('ADBE Vector Stroke Color').setValue({color_to_js(self.ui_color)});\n")
                 script.append(f"xtickStroke{pos_var}.property('ADBE Vector Stroke Width').setValue(2);\n")
-                # Fade-in animation for tick mark
-                script.append(f"xtickStroke{pos_var}.property('ADBE Vector Stroke Opacity').setValueAtTime(0, 0);\n")
-                script.append(f"xtickStroke{pos_var}.property('ADBE Vector Stroke Opacity').setValueAtTime({ANIM_DURATION * (0.7 + 0.3 * idx / 10)}, 100);\n")
-                # Apply easy ease to X tick stroke opacity keyframes
-                if self.easy_ease:
-                    script.append(f"applyEasyEase(xtickStroke{pos_var}.property('ADBE Vector Stroke Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+                # Opacity animation for tick mark (constant duration or disabled)
+                if self.animate_opacity:
+                    script.append(f"xtickStroke{pos_var}.property('ADBE Vector Stroke Opacity').setValueAtTime(0, 0);\n")
+                    script.append(f"xtickStroke{pos_var}.property('ADBE Vector Stroke Opacity').setValueAtTime({ANIM_DURATION * 0.8}, 100);\n")
+                    if self.easy_ease:
+                        script.append(f"applyEasyEase(xtickStroke{pos_var}.property('ADBE Vector Stroke Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+                else:
+                    script.append(f"xtickStroke{pos_var}.property('ADBE Vector Stroke Opacity').setValue(100);\n")
                 # Tick label: just below the tick, in graph-local coordinates
                 if self.show_tick_labels:
                     lx, ly = self._data_to_shape(pos, x_axis_y, xmin_pad, xmax_pad, ymin_pad, ymax_pad)
@@ -840,16 +1128,21 @@ if (comp && comp instanceof CompItem) {
                     script.append(f"xtickLabel{pos_var}.parent = PlotAnchor;\n")
                     script.append(f"var xtickLabelProp{pos_var} = xtickLabel{pos_var}.property('Source Text');\n")
                     script.append(f"var xtickLabelDoc{pos_var} = xtickLabelProp{pos_var}.value;\n")
-                    script.append(f"xtickLabelDoc{pos_var}.fontSize = 16;\n")
-                    script.append(f"xtickLabelDoc{pos_var}.fillColor = [0, 0, 0];\n")
+                    script.append(f"xtickLabelDoc{pos_var}.fontSize = {int(16 * self.font_scale)};\n")
+                    script.append(f"xtickLabelDoc{pos_var}.fillColor = {color_to_js(self.ui_color)};\n")
                     script.append(f"xtickLabelDoc{pos_var}.justification = ParagraphJustification.CENTER_JUSTIFY;\n")
                     script.append(f"xtickLabelProp{pos_var}.setValue(xtickLabelDoc{pos_var});\n")
-                    # Fade-in animation for label
-                    script.append(f"xtickLabel{pos_var}.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
-                    script.append(f"xtickLabel{pos_var}.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * (0.8 + 0.2 * idx / 10)}, 100);\n")
-                    # Apply easy ease to X tick label opacity keyframes
-                    if self.easy_ease:
-                        script.append(f"applyEasyEase(xtickLabel{pos_var}.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+                    script.append(f"var xsr{pos_var} = xtickLabel{pos_var}.sourceRectAtTime(0, false);\n")
+                    script.append(f"var xap{pos_var} = xtickLabel{pos_var}.property('Transform').property('Anchor Point');\n")
+                    script.append(f"xap{pos_var}.setValue([xsr{pos_var}.left + xsr{pos_var}.width/2, xsr{pos_var}.top]);\n")
+                    # Opacity animation for label (constant duration or disabled)
+                    if self.animate_opacity:
+                        script.append(f"xtickLabel{pos_var}.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
+                        script.append(f"xtickLabel{pos_var}.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * 0.9}, 100);\n")
+                        if self.easy_ease:
+                            script.append(f"applyEasyEase(xtickLabel{pos_var}.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+                    else:
+                        script.append(f"xtickLabel{pos_var}.property('Transform').property('Opacity').setValue(100);\n")
         # Y Ticks
         if self.yticks:
             for idx, (pos, label) in enumerate(self.yticks):
@@ -870,14 +1163,16 @@ if (comp && comp instanceof CompItem) {
                 script.append(f"ytickShape{pos_var}.closed = false;\n")
                 script.append(f"ytickPath{pos_var}.setValue(ytickShape{pos_var});\n")
                 script.append(f"var ytickStroke{pos_var} = ytickContents{pos_var}.addProperty('ADBE Vector Graphic - Stroke');\n")
-                script.append(f"ytickStroke{pos_var}.property('ADBE Vector Stroke Color').setValue([0, 0, 0]);\n")
+                script.append(f"ytickStroke{pos_var}.property('ADBE Vector Stroke Color').setValue({color_to_js(self.ui_color)});\n")
                 script.append(f"ytickStroke{pos_var}.property('ADBE Vector Stroke Width').setValue(2);\n")
-                # Fade-in animation for tick mark
-                script.append(f"ytickStroke{pos_var}.property('ADBE Vector Stroke Opacity').setValueAtTime(0, 0);\n")
-                script.append(f"ytickStroke{pos_var}.property('ADBE Vector Stroke Opacity').setValueAtTime({ANIM_DURATION * (0.7 + 0.3 * idx / 10)}, 100);\n")
-                # Apply easy ease to Y tick stroke opacity keyframes
-                if self.easy_ease:
-                    script.append(f"applyEasyEase(ytickStroke{pos_var}.property('ADBE Vector Stroke Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+                # Opacity animation for tick mark (constant duration or disabled)
+                if self.animate_opacity:
+                    script.append(f"ytickStroke{pos_var}.property('ADBE Vector Stroke Opacity').setValueAtTime(0, 0);\n")
+                    script.append(f"ytickStroke{pos_var}.property('ADBE Vector Stroke Opacity').setValueAtTime({ANIM_DURATION * 0.8}, 100);\n")
+                    if self.easy_ease:
+                        script.append(f"applyEasyEase(ytickStroke{pos_var}.property('ADBE Vector Stroke Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+                else:
+                    script.append(f"ytickStroke{pos_var}.property('ADBE Vector Stroke Opacity').setValue(100);\n")
                 # Tick label: just left of the tick, in graph-local coordinates
                 if self.show_tick_labels:
                     lx, ly = self._data_to_shape(y_axis_x, pos, xmin_pad, xmax_pad, ymin_pad, ymax_pad)
@@ -887,16 +1182,21 @@ if (comp && comp instanceof CompItem) {
                     script.append(f"ytickLabel{pos_var}.parent = PlotAnchor;\n")
                     script.append(f"var ytickLabelProp{pos_var} = ytickLabel{pos_var}.property('Source Text');\n")
                     script.append(f"var ytickLabelDoc{pos_var} = ytickLabelProp{pos_var}.value;\n")
-                    script.append(f"ytickLabelDoc{pos_var}.fontSize = 16;\n")
-                    script.append(f"ytickLabelDoc{pos_var}.fillColor = [0, 0, 0];\n")
-                    script.append(f"ytickLabelDoc{pos_var}.justification = ParagraphJustification.CENTER_JUSTIFY;\n")
+                    script.append(f"ytickLabelDoc{pos_var}.fontSize = {int(16 * self.font_scale)};\n")
+                    script.append(f"ytickLabelDoc{pos_var}.fillColor = {color_to_js(self.ui_color)};\n")
+                    script.append(f"ytickLabelDoc{pos_var}.justification = ParagraphJustification.RIGHT_JUSTIFY;\n")
                     script.append(f"ytickLabelProp{pos_var}.setValue(ytickLabelDoc{pos_var});\n")
-                    # Fade-in animation for label
-                    script.append(f"ytickLabel{pos_var}.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
-                    script.append(f"ytickLabel{pos_var}.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * (0.8 + 0.2 * idx / 10)}, 100);\n")
-                    # Apply easy ease to Y tick label opacity keyframes
-                    if self.easy_ease:
-                        script.append(f"applyEasyEase(ytickLabel{pos_var}.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+                    script.append(f"var ysr{pos_var} = ytickLabel{pos_var}.sourceRectAtTime(0, false);\n")
+                    script.append(f"var yap{pos_var} = ytickLabel{pos_var}.property('Transform').property('Anchor Point');\n")
+                    script.append(f"yap{pos_var}.setValue([ysr{pos_var}.left + ysr{pos_var}.width, ysr{pos_var}.top + ysr{pos_var}.height/2]);\n")
+                    # Opacity animation for label (constant duration or disabled)
+                    if self.animate_opacity:
+                        script.append(f"ytickLabel{pos_var}.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
+                        script.append(f"ytickLabel{pos_var}.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * 0.9}, 100);\n")
+                        if self.easy_ease:
+                            script.append(f"applyEasyEase(ytickLabel{pos_var}.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+                    else:
+                        script.append(f"ytickLabel{pos_var}.property('Transform').property('Opacity').setValue(100);\n")
 
     def _generate_jsx(self) -> str:
         ANIM_DURATION = 3 * (1/2)  # seconds for default animation
@@ -953,20 +1253,22 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
         # All graph elements (background, axes, grid, etc.) are drawn at the comp center
         center_x = self.comp_width / 2
         center_y = self.comp_height / 2
-        script.append(f"var bgLayer = comp.layers.addShape();\n")
-        script.append(f"bgLayer.name = 'GraphBG';\n")
-        script.append(f"var bgContents = bgLayer.property('ADBE Root Vectors Group');\n")
-        script.append(f"var bgRect = bgContents.addProperty('ADBE Vector Shape - Rect');\n")
-        script.append(f"bgRect.property('ADBE Vector Rect Size').setValue([{self.width}, {self.height}]);\n")
-        script.append(f"bgRect.property('ADBE Vector Rect Position').setValue([0, 0]);\n")
-        script.append(f"var bgFill = bgContents.addProperty('ADBE Vector Graphic - Fill');\n")
-        script.append(f"bgFill.property('ADBE Vector Fill Color').setValue({color_to_js(self.bg_color)});\n")
-        # Add stroke to background rectangle
-        script.append(f"var bgStroke = bgContents.addProperty('ADBE Vector Graphic - Stroke');\n")
-        script.append(f"bgStroke.property('ADBE Vector Stroke Color').setValue({color_to_js(self.bg_stroke_color)});\n")
-        script.append(f"bgStroke.property('ADBE Vector Stroke Width').setValue({self.bg_stroke_width});\n")
-        script.append(f"bgLayer.property('Transform').property('Position').setValue([{center_x}, {center_y}]);\n")
-        script.append(f"bgLayer.parent = PlotAnchor;\n")
+        # Optional background rectangle (skipped when bg_color == 'none')
+        if not (isinstance(self.bg_color, str) and self.bg_color.lower() == "none"):
+            script.append(f"var bgLayer = comp.layers.addShape();\n")
+            script.append(f"bgLayer.name = 'GraphBG';\n")
+            script.append(f"var bgContents = bgLayer.property('ADBE Root Vectors Group');\n")
+            script.append(f"var bgRect = bgContents.addProperty('ADBE Vector Shape - Rect');\n")
+            script.append(f"bgRect.property('ADBE Vector Rect Size').setValue([{self.width}, {self.height}]);\n")
+            script.append(f"bgRect.property('ADBE Vector Rect Position').setValue([0, 0]);\n")
+            script.append(f"var bgFill = bgContents.addProperty('ADBE Vector Graphic - Fill');\n")
+            script.append(f"bgFill.property('ADBE Vector Fill Color').setValue({color_to_js(self.bg_color)});\n")
+            # Add stroke to background rectangle
+            script.append(f"var bgStroke = bgContents.addProperty('ADBE Vector Graphic - Stroke');\n")
+            script.append(f"bgStroke.property('ADBE Vector Stroke Color').setValue({color_to_js(self.bg_stroke_color)});\n")
+            script.append(f"bgStroke.property('ADBE Vector Stroke Width').setValue({self.bg_stroke_width});\n")
+            script.append(f"bgLayer.property('Transform').property('Position').setValue([{center_x}, {center_y}]);\n")
+            script.append(f"bgLayer.parent = PlotAnchor;\n")
 
         # In _generate_jsx, calculate global data limits with NO padding
         all_x = []
@@ -982,6 +1284,25 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
                 all_x.extend(elem["bin_right"])
                 all_y.extend(elem["heights"])
                 all_y.append(0)  # include baseline
+            elif elem["type"] == "barh":
+                # Use widths for x, bin edges for y
+                all_x.extend(elem["widths"])
+                all_x.append(0)  # include baseline
+                all_y.extend(elem["bin_centers"])
+                all_y.extend(elem["bin_bottom"])
+                all_y.extend(elem["bin_top"])
+                # Add padding equal to the gap between bars
+                if len(elem["bin_bottom"]) > 1:
+                    # Calculate the gap between bars from the bar dimensions
+                    centers = sorted(elem["bin_centers"])
+                    spacing = centers[1] - centers[0]  # distance between consecutive bar centers
+                    bar_height = elem["bin_top"][0] - elem["bin_bottom"][0]  # height of one bar
+                    gap = spacing - bar_height  # gap between bars
+                    # Add padding equal to one gap
+                    min_y = min(elem["bin_bottom"])
+                    max_y = max(elem["bin_top"])
+                    all_y.append(min_y - gap)
+                    all_y.append(max_y + gap)
         if self.xlim:
             xmin, xmax = self.xlim
         else:
@@ -997,7 +1318,8 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
         ymax_pad = ymax
         # Check what plot types we have to decide on axes placement
         has_scatter = any(elem["type"] == "scatter" for elem in self.elements)
-        has_bars_or_hist = any(elem["type"] in ["histogram", "bar_graph"] for elem in self.elements)
+        has_bars_or_hist = any(elem["type"] in ["histogram", "bar_graph", "barh"] for elem in self.elements)
+        has_barh = any(elem["type"] == "barh" for elem in self.elements)
         
         # For grid lines, fade in with opacity (GENERATED FIRST so grid appears behind plot elements)
         if self.show_grid:
@@ -1058,7 +1380,7 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
         # Generate axes BEFORE plot elements ONLY for scatter plots (so axes appear behind points)
         # For histograms and bar graphs, axes will be generated AFTER plot elements (so they appear on top)
         if has_scatter and not has_bars_or_hist:
-            self._generate_axes_jsx(script, center_x, center_y, xmin_pad, xmax_pad, ymin_pad, ymax_pad, ANIM_DURATION)
+            self._generate_axes_jsx(script, center_x, center_y, xmin_pad, xmax_pad, ymin_pad, ymax_pad, ANIM_DURATION, has_barh)
 
         # Plot elements
         for i, elem in enumerate(self.elements):
@@ -1270,11 +1592,129 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
                         script.append(f"applyEasyEase(barScale{i}_{j}, {self.ease_speed}, {self.ease_influence});\n")
                     if elem.get("drop_shadow", False):
                         script.append(self._generate_drop_shadow_jsx(f"barLayer{i}_{j}", f"{i}_{j}"))
+            elif elem["type"] == "barh":
+                # Horizontal bar graph rendering
+                alpha = elem.get("alpha", 0.8)
+                bin_bottom = elem["bin_bottom"]
+                bin_top = elem["bin_top"]
+                widths = elem["widths"]
+                n_bars = len(bin_bottom)
+                bar_anim_times = elem.get("bar_anim_times")
+                total_anim = elem["animate"] if elem["animate"] else 1.0
+                animate_downward = elem.get("animate_downward", False)
+                anchor_at_y_axis = elem.get("anchor_at_y_axis", False)
+                
+                # Handle bar_anim_times (individual bar duration)
+                if bar_anim_times is None:
+                    # Default: sequential animation, no overlap
+                    individual_duration = total_anim / n_bars
+                    bar_anim_times = [individual_duration] * n_bars
+                    # Bars animate one after another
+                    start_times_base = np.linspace(0, total_anim - individual_duration, n_bars)
+                elif isinstance(bar_anim_times, (int, float)):
+                    # User specified individual bar duration - enable overlapping
+                    individual_duration = float(bar_anim_times)
+                    bar_anim_times = [individual_duration] * n_bars
+                    if n_bars > 1:
+                        # Distribute start times so all bars finish within total_anim
+                        # Last bar starts at (total_anim - individual_duration) and finishes at total_anim
+                        start_times_base = np.linspace(0, max(0, total_anim - individual_duration), n_bars)
+                    else:
+                        start_times_base = [0]
+                else:
+                    # List of durations provided
+                    if not hasattr(bar_anim_times, '__iter__') or len(bar_anim_times) != n_bars:
+                        bar_anim_times = [total_anim / n_bars] * n_bars
+                    start_times_base = np.linspace(0, total_anim - bar_anim_times[0], n_bars)
+
+                # Reorder start times to animate downward (top to bottom) if requested
+                centers = np.asarray(elem.get("bin_centers", []))
+                if animate_downward and len(centers) == n_bars:
+                    order = np.argsort(centers)[::-1]  # descending by y value (top to bottom)
+                    start_times = [0.0] * n_bars
+                    for rank, j_idx in enumerate(order):
+                        start_times[j_idx] = float(start_times_base[rank])
+                else:
+                    start_times = start_times_base
+                
+                # Check if gradient colors are defined
+                gradient_colors = elem.get("gradient_colors")
+                if not gradient_colors:
+                    # Use single color for all bars
+                    color_js = color_to_js(elem["color"])
+                
+                for j, (bottom, top, width) in enumerate(zip(bin_bottom, bin_top, widths)):
+                    # Use gradient color for this bar if available
+                    if gradient_colors and j < len(gradient_colors):
+                        bar_color_js = f"[{gradient_colors[j][0]}, {gradient_colors[j][1]}, {gradient_colors[j][2]}]"
+                    else:
+                        bar_color_js = color_js
+                    
+                    # Rectangle corners in data coordinates (horizontal bars)
+                    # Apply horizontal clipping to [xmin_pad, xmax_pad] when show_all_points is False
+                    clip = not self.show_all_points
+                    if width >= 0:
+                        bar_start, bar_end = 0, width
+                    else:
+                        bar_start, bar_end = width, 0
+                    if clip:
+                        xi0 = max(bar_start, xmin_pad)
+                        xi1 = min(bar_end, xmax_pad)
+                    else:
+                        xi0, xi1 = bar_start, bar_end
+                    # If fully out of bounds, skip drawing this bar
+                    if xi1 <= xi0 + 1e-12:
+                        continue
+                    x0, y0 = xi0, bottom  # left boundary after clipping
+                    x1, y1 = xi1, top     # right boundary after clipping
+                    # Convert to shape coordinates
+                    sx0, sy0 = self._data_to_shape(x0, y0, xmin_pad, xmax_pad, ymin_pad, ymax_pad)
+                    sx1, sy1 = self._data_to_shape(x1, y1, xmin_pad, xmax_pad, ymin_pad, ymax_pad)
+                    bar_width = abs(sx1 - sx0)  # horizontal extent
+                    bar_height = abs(sy1 - sy0)  # vertical thickness
+                    # Anchor selection: pyramid bars anchor at y-axis; others anchor at bar start
+                    if anchor_at_y_axis:
+                        center_y_data = (bottom + top) / 2
+                        axis_sx, _ = self._data_to_shape(0, center_y_data, xmin_pad, xmax_pad, ymin_pad, ymax_pad)
+                        anchor_x = axis_sx
+                    else:
+                        anchor_x = sx0  # left boundary (after clipping)
+                    anchor_y = (sy0 + sy1) / 2  # center vertically
+                    position_x = center_x + anchor_x
+                    position_y = center_y + anchor_y
+                    script.append(f"var barhLayer{i}_{j} = comp.layers.addShape();\n")
+                    script.append(f"barhLayer{i}_{j}.name = 'BarhBar_{i}_{j}';\n")
+                    script.append(f"barhLayer{i}_{j}.property('Transform').property('Position').setValue([{position_x}, {position_y}]);\n")
+                    script.append(f"barhLayer{i}_{j}.parent = PlotAnchor;\n")
+                    script.append(f"var barhContents{i}_{j} = barhLayer{i}_{j}.property('ADBE Root Vectors Group');\n")
+                    script.append(f"var barhRect{i}_{j} = barhContents{i}_{j}.addProperty('ADBE Vector Shape - Rect');\n")
+                    script.append(f"barhRect{i}_{j}.property('ADBE Vector Rect Size').setValue([{bar_width}, {bar_height}]);\n")
+                    # Position rectangle so scaling originates at anchor
+                    if anchor_at_y_axis:
+                        if width >= 0:
+                            script.append(f"barhRect{i}_{j}.property('ADBE Vector Rect Position').setValue([{bar_width/2}, 0]);\n")
+                        else:
+                            script.append(f"barhRect{i}_{j}.property('ADBE Vector Rect Position').setValue([{-bar_width/2}, 0]);\n")
+                    else:
+                        script.append(f"barhRect{i}_{j}.property('ADBE Vector Rect Position').setValue([{bar_width/2}, 0]);\n")
+                    script.append(f"var barhFill{i}_{j} = barhContents{i}_{j}.addProperty('ADBE Vector Graphic - Fill');\n")
+                    script.append(f"barhFill{i}_{j}.property('ADBE Vector Fill Color').setValue({bar_color_js});\n")
+                    script.append(f"barhFill{i}_{j}.property('ADBE Vector Fill Opacity').setValue({int(alpha*100)});\n")
+                    # Animate bar width (scale X from axis)
+                    anim_time = bar_anim_times[j]
+                    start_time = start_times[j]
+                    script.append(f"var barhScale{i}_{j} = barhLayer{i}_{j}.property('Transform').property('Scale');\n")
+                    script.append(f"barhScale{i}_{j}.setValueAtTime({delay + start_time}, [0, 100, 100]);\n")
+                    script.append(f"barhScale{i}_{j}.setValueAtTime({delay + start_time + anim_time}, [100, 100, 100]);\n")
+                    if self.easy_ease:
+                        script.append(f"applyEasyEase(barhScale{i}_{j}, {self.ease_speed}, {self.ease_influence});\n")
+                    if elem.get("drop_shadow", False):
+                        script.append(self._generate_drop_shadow_jsx(f"barhLayer{i}_{j}", f"{i}_{j}"))
 
         # Generate axes AFTER plot elements for histograms and bar graphs (so they appear on top)
         # Mixed plots get axes on top to accommodate bar/histogram rendering
         if has_bars_or_hist or not has_scatter:
-            self._generate_axes_jsx(script, center_x, center_y, xmin_pad, xmax_pad, ymin_pad, ymax_pad, ANIM_DURATION)
+            self._generate_axes_jsx(script, center_x, center_y, xmin_pad, xmax_pad, ymin_pad, ymax_pad, ANIM_DURATION, has_barh)
 
         # --- DYNAMIC LEGEND PLACEMENT (relative to graph area) ---
         legend_entries = []
@@ -1302,6 +1742,9 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
             elif elem["type"] in ["histogram", "bar_graph"]:
                 px = elem["bin_centers"]
                 py = elem["heights"]
+            elif elem["type"] == "barh":
+                px = elem["widths"]
+                py = elem["bin_centers"]
             else:
                 continue
 
@@ -1350,8 +1793,8 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
                 script.append(f"legendLabel{i}.parent = PlotAnchor;\n")
                 script.append(f"var legendLabelProp{i} = legendLabel{i}.property('Source Text');\n")
                 script.append(f"var legendLabelDoc{i} = legendLabelProp{i}.value;\n")
-                script.append(f"legendLabelDoc{i}.fontSize = 24;\n")
-                script.append(f"legendLabelDoc{i}.fillColor = [0, 0, 0];\n")
+                script.append(f"legendLabelDoc{i}.fontSize = {int(24 * self.font_scale)};\n")
+                script.append(f"legendLabelDoc{i}.fillColor = {color_to_js(self.ui_color)};\n")
                 script.append(f"legendLabelDoc{i}.justification = ParagraphJustification.LEFT_JUSTIFY;\n")
                 script.append(f"legendLabelProp{i}.setValue(legendLabelDoc{i});\n")
                 # Fade-in animation for label
@@ -1373,16 +1816,23 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
             script.append(f"titleLayer.parent = PlotAnchor;\n")
             script.append("var titleProp = titleLayer.property('Source Text');\n")
             script.append("var titleDoc = titleProp.value;\n")
-            script.append("titleDoc.fontSize = 48;\n")
-            script.append("titleDoc.fillColor = [0, 0, 0];\n")
+            script.append(f"titleDoc.fontSize = {int(48 * self.font_scale)};\n")
+            script.append(f"titleDoc.fillColor = {color_to_js(self.ui_color)};\n")
             script.append("titleDoc.justification = ParagraphJustification.CENTER_JUSTIFY;\n")
             script.append("titleProp.setValue(titleDoc);\n")
+            # Anchor the title to top-center so its top edge aligns precisely
+            script.append("var titleSR = titleLayer.sourceRectAtTime(0, false);\n")
+            script.append("var titleAP = titleLayer.property('Transform').property('Anchor Point');\n")
+            script.append("titleAP.setValue([titleSR.left + titleSR.width/2, titleSR.top]);\n")
             
             # Animate title
-            script.append(f"titleLayer.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
-            script.append(f"titleLayer.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * 1.1}, 100);\n")
-            if self.easy_ease:
-                script.append(f"applyEasyEase(titleLayer.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+            if self.animate_opacity:
+                script.append(f"titleLayer.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
+                script.append(f"titleLayer.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * 0.9}, 100);\n")
+                if self.easy_ease:
+                    script.append(f"applyEasyEase(titleLayer.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+            else:
+                script.append(f"titleLayer.property('Transform').property('Opacity').setValue(100);\n")
             
             # Add drop shadow to title if specified
             if self.drop_shadow:
@@ -1402,16 +1852,22 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
             script.append(f"xlabelLayer.parent = PlotAnchor;\n")
             script.append("var xlabelProp = xlabelLayer.property('Source Text');\n")
             script.append("var xlabelDoc = xlabelProp.value;\n")
-            script.append("xlabelDoc.fontSize = 24;\n")
-            script.append("xlabelDoc.fillColor = [0, 0, 0];\n")
+            script.append(f"xlabelDoc.fontSize = {int(24 * self.font_scale)};\n")
+            script.append(f"xlabelDoc.fillColor = {color_to_js(self.ui_color)};\n")
             script.append("xlabelDoc.justification = ParagraphJustification.CENTER_JUSTIFY;\n")
             script.append("xlabelProp.setValue(xlabelDoc);\n")
+            script.append("var xlabelSR = xlabelLayer.sourceRectAtTime(0, false);\n")
+            script.append("var xlabelAP = xlabelLayer.property('Transform').property('Anchor Point');\n")
+            script.append("xlabelAP.setValue([xlabelSR.left + xlabelSR.width/2, xlabelSR.top]);\n")
             
             # Animate xlabel
-            script.append(f"xlabelLayer.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
-            script.append(f"xlabelLayer.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * 1.2}, 100);\n")
-            if self.easy_ease:
-                script.append(f"applyEasyEase(xlabelLayer.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+            if self.animate_opacity:
+                script.append(f"xlabelLayer.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
+                script.append(f"xlabelLayer.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * 0.9}, 100);\n")
+                if self.easy_ease:
+                    script.append(f"applyEasyEase(xlabelLayer.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+            else:
+                script.append(f"xlabelLayer.property('Transform').property('Opacity').setValue(100);\n")
             
             # Add drop shadow to x-label if specified
             if self.drop_shadow:
@@ -1430,16 +1886,19 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
             script.append("ylabelLayer.property('Transform').property('Rotation').setValue(-90);\n")
             script.append("var ylabelProp = ylabelLayer.property('Source Text');\n")
             script.append("var ylabelDoc = ylabelProp.value;\n")
-            script.append("ylabelDoc.fontSize = 24;\n")
-            script.append("ylabelDoc.fillColor = [0, 0, 0];\n")
+            script.append(f"ylabelDoc.fontSize = {int(24 * self.font_scale)};\n")
+            script.append(f"ylabelDoc.fillColor = {color_to_js(self.ui_color)};\n")
             script.append("ylabelDoc.justification = ParagraphJustification.CENTER_JUSTIFY;\n")
             script.append("ylabelProp.setValue(ylabelDoc);\n")
             
             # Animate ylabel
-            script.append(f"ylabelLayer.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
-            script.append(f"ylabelLayer.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * 1.2}, 100);\n")
-            if self.easy_ease:
-                script.append(f"applyEasyEase(ylabelLayer.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+            if self.animate_opacity:
+                script.append(f"ylabelLayer.property('Transform').property('Opacity').setValueAtTime(0, 0);\n")
+                script.append(f"ylabelLayer.property('Transform').property('Opacity').setValueAtTime({ANIM_DURATION * 0.9}, 100);\n")
+                if self.easy_ease:
+                    script.append(f"applyEasyEase(ylabelLayer.property('Transform').property('Opacity'), {self.ease_speed}, {self.ease_influence});\n")
+            else:
+                script.append(f"ylabelLayer.property('Transform').property('Opacity').setValue(100);\n")
             
             # Add drop shadow to y-label if specified
             if self.drop_shadow:
@@ -1474,9 +1933,9 @@ if (!comp || !(comp instanceof CompItem) || comp.name != '{self.comp_name}') {{
                 # Set text properties
                 script.append(f"var annotationProp{annotation_count} = annotationLayer{annotation_count}.property('Source Text');\n")
                 script.append(f"var annotationDoc{annotation_count} = annotationProp{annotation_count}.value;\n")
-                script.append(f"annotationDoc{annotation_count}.fontSize = {elem['fontsize']};\n")
+                script.append(f"annotationDoc{annotation_count}.fontSize = {int(elem['fontsize'] * self.font_scale)};\n")
                 script.append(f"annotationDoc{annotation_count}.font = \"{elem['font']}\";\n")
-                script.append(f"annotationDoc{annotation_count}.fillColor = [0, 0, 0];\n")
+                script.append(f"annotationDoc{annotation_count}.fillColor = {color_to_js(self.ui_color)};\n")
                 script.append(f"annotationDoc{annotation_count}.justification = {justification};\n")
                 script.append(f"annotationProp{annotation_count}.setValue(annotationDoc{annotation_count});\n")
                 
