@@ -24,7 +24,7 @@ AEGraph(
     animate_opacity=False,
     animate_axes=False,
     bg_color="none",
-    ui_color="black",
+    ui_color="white",
     font_scale = 1.7,
 ).add_population_pyramid(
     ages=ages,
