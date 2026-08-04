@@ -8,5 +8,30 @@ __pycache__/
 # Ignore jsx files
 *.jsx
 
+# Ignore default JSX output folder
+jsx_output/
+
 # Ignore .DS_Store
 .DS_Store
+
+# Ignore testing and documentation site files
+testing/
+site/
+docs/
+mkdocs.yml
+requirements-docs.txt
+.github/workflows/docs.yml
+scripts/gen_theme_docs.py
+scripts/render_doc_gifs.py
+scripts/render_themes.py
+
+# Ignore per-user / per-machine config
+.env.user
+
+# Ignore local render state and source film assets
+.ae_script_done/
+film_elements/
+
+# Ignore local or unlicensed visual assets
+all country flags/
+distress_textures/

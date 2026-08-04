@@ -1,0 +1,2452 @@
+{
+  "themes": [
+    {
+      "name": "Warm Atlas",
+      "bg": [
+        230,
+        220,
+        204
+      ],
+      "ui": [
+        92,
+        110,
+        136
+      ],
+      "grid": [
+        118,
+        135,
+        152
+      ],
+      "subtitle": [
+        92,
+        110,
+        136
+      ],
+      "label": [
+        92,
+        110,
+        136
+      ],
+      "distress_texture": 7,
+      "object_color_1": [
+        196,
+        122,
+        78
+      ],
+      "object_color_2": [
+        88,
+        122,
+        148
+      ],
+      "is_dark": 0,
+      "fonts": {
+        "title": "Optima-Bold",
+        "subtitle": "Optima-Italic",
+        "label": "Optima-Bold",
+        "tick": "Optima-Regular",
+        "legend": "Optima-Regular",
+        "body": "Optima-Regular"
+      }
+    },
+    {
+      "name": "Soft Terracotta",
+      "bg": [
+        242,
+        232,
+        220
+      ],
+      "ui": [
+        82,
+        102,
+        121
+      ],
+      "grid": [
+        140,
+        150,
+        160
+      ],
+      "subtitle": [
+        82,
+        102,
+        121
+      ],
+      "label": [
+        82,
+        102,
+        121
+      ],
+      "distress_texture": 2,
+      "object_color_1": [
+        184,
+        96,
+        62
+      ],
+      "object_color_2": [
+        108,
+        142,
+        136
+      ],
+      "is_dark": 0,
+      "fonts": {
+        "title": "Optima-Bold",
+        "subtitle": "Optima-Italic",
+        "label": "Optima-Bold",
+        "tick": "Optima-Regular",
+        "legend": "Optima-Regular",
+        "body": "Optima-Regular"
+      }
+    },
+    {
+      "name": "Midnight Neon",
+      "bg": [
+        18,
+        22,
+        28
+      ],
+      "ui": [
+        215,
+        223,
+        232
+      ],
+      "grid": [
+        80,
+        90,
+        102
+      ],
+      "subtitle": [
+        170,
+        180,
+        190
+      ],
+      "label": [
+        230,
+        235,
+        240
+      ],
+      "distress_texture": 1,
+      "object_color_1": [
+        210,
+        90,
+        255
+      ],
+      "object_color_2": [
+        70,
+        210,
+        255
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "HelveticaNeue-CondensedBlack",
+        "subtitle": "HelveticaNeue-Medium",
+        "label": "HelveticaNeue-CondensedBold",
+        "tick": "HelveticaNeue",
+        "legend": "HelveticaNeue",
+        "body": "HelveticaNeue"
+      }
+    },
+    {
+      "name": "Slate Report",
+      "bg": [
+        228,
+        232,
+        236
+      ],
+      "ui": [
+        54,
+        68,
+        82
+      ],
+      "grid": [
+        145,
+        155,
+        165
+      ],
+      "subtitle": [
+        80,
+        92,
+        105
+      ],
+      "label": [
+        54,
+        68,
+        82
+      ],
+      "distress_texture": null,
+      "object_color_1": [
+        190,
+        60,
+        70
+      ],
+      "object_color_2": [
+        95,
+        140,
+        190
+      ],
+      "is_dark": 0,
+      "fonts": {
+        "title": "AvenirNext-Bold",
+        "subtitle": "AvenirNext-Italic",
+        "label": "AvenirNext-DemiBold",
+        "tick": "AvenirNext-Regular",
+        "legend": "AvenirNext-Regular",
+        "body": "AvenirNext-Regular"
+      }
+    },
+    {
+      "name": "Vintage Paper",
+      "bg": [
+        224,
+        214,
+        194
+      ],
+      "ui": [
+        74,
+        66,
+        56
+      ],
+      "grid": [
+        148,
+        132,
+        112
+      ],
+      "subtitle": [
+        90,
+        82,
+        72
+      ],
+      "label": [
+        74,
+        66,
+        56
+      ],
+      "distress_texture": 7,
+      "object_color_1": [
+        148,
+        94,
+        72
+      ],
+      "object_color_2": [
+        112,
+        126,
+        138
+      ],
+      "is_dark": 0,
+      "fonts": {
+        "title": "AmericanTypewriter-Bold",
+        "subtitle": "AmericanTypewriter",
+        "label": "AmericanTypewriter-Bold",
+        "tick": "AmericanTypewriter",
+        "legend": "AmericanTypewriter",
+        "body": "AmericanTypewriter"
+      }
+    },
+    {
+      "name": "Minimal Frost",
+      "bg": [
+        248,
+        247,
+        243
+      ],
+      "ui": [
+        60,
+        70,
+        82
+      ],
+      "grid": [
+        185,
+        190,
+        196
+      ],
+      "subtitle": [
+        100,
+        110,
+        120
+      ],
+      "label": [
+        60,
+        70,
+        82
+      ],
+      "distress_texture": 2,
+      "object_color_1": [
+        72,
+        88,
+        112
+      ],
+      "object_color_2": [
+        160,
+        205,
+        225
+      ],
+      "is_dark": 0,
+      "fonts": {
+        "title": "HelveticaNeue-Medium",
+        "subtitle": "HelveticaNeue-Thin",
+        "label": "HelveticaNeue-Light",
+        "tick": "HelveticaNeue-Light",
+        "legend": "HelveticaNeue-Light",
+        "body": "HelveticaNeue-Light"
+      }
+    },
+    {
+      "name": "Deep Ocean",
+      "bg": [
+        14,
+        26,
+        38
+      ],
+      "ui": [
+        220,
+        230,
+        240
+      ],
+      "grid": [
+        70,
+        90,
+        110
+      ],
+      "subtitle": [
+        180,
+        190,
+        205
+      ],
+      "label": [
+        235,
+        240,
+        245
+      ],
+      "distress_texture": 5,
+      "object_color_1": [
+        118,
+        255,
+        208
+      ],
+      "object_color_2": [
+        52,
+        148,
+        190
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "AvenirNext-Bold",
+        "subtitle": "AvenirNext-Italic",
+        "label": "AvenirNext-DemiBold",
+        "tick": "AvenirNext-Regular",
+        "legend": "AvenirNext-Regular",
+        "body": "AvenirNext-Regular"
+      }
+    },
+    {
+      "name": "Muted Earth",
+      "bg": [
+        214,
+        206,
+        194
+      ],
+      "ui": [
+        58,
+        52,
+        48
+      ],
+      "grid": [
+        120,
+        110,
+        100
+      ],
+      "subtitle": [
+        82,
+        74,
+        68
+      ],
+      "label": [
+        58,
+        52,
+        48
+      ],
+      "distress_texture": 4,
+      "object_color_1": [
+        156,
+        82,
+        58
+      ],
+      "object_color_2": [
+        116,
+        124,
+        92
+      ],
+      "is_dark": 0,
+      "fonts": {
+        "title": "Optima-Bold",
+        "subtitle": "Optima-Italic",
+        "label": "Optima-Bold",
+        "tick": "Optima-Regular",
+        "legend": "Optima-Regular",
+        "body": "Optima-Regular"
+      }
+    },
+    {
+      "name": "Acid Jungle",
+      "bg": [
+        20,
+        24,
+        18
+      ],
+      "ui": [
+        214,
+        255,
+        196
+      ],
+      "grid": [
+        70,
+        96,
+        64
+      ],
+      "subtitle": [
+        170,
+        210,
+        160
+      ],
+      "label": [
+        230,
+        255,
+        220
+      ],
+      "distress_texture": 5,
+      "object_color_1": [
+        255,
+        60,
+        160
+      ],
+      "object_color_2": [
+        180,
+        255,
+        110
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "Futura-Bold",
+        "subtitle": "Futura-MediumItalic",
+        "label": "Futura-Medium",
+        "tick": "Futura-Medium",
+        "legend": "Futura-Medium",
+        "body": "Futura-Medium"
+      }
+    },
+    {
+      "name": "Cyber Grape",
+      "bg": [
+        26,
+        18,
+        36
+      ],
+      "ui": [
+        228,
+        210,
+        255
+      ],
+      "grid": [
+        88,
+        72,
+        110
+      ],
+      "subtitle": [
+        185,
+        170,
+        215
+      ],
+      "label": [
+        240,
+        232,
+        255
+      ],
+      "distress_texture": 1,
+      "object_color_1": [
+        255,
+        210,
+        80
+      ],
+      "object_color_2": [
+        130,
+        100,
+        255
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "Menlo-Bold",
+        "subtitle": "Menlo-Italic",
+        "label": "Menlo-Bold",
+        "tick": "Menlo-Regular",
+        "legend": "Menlo-Regular",
+        "body": "Menlo-Regular"
+      }
+    },
+    {
+      "name": "Toxic Mint",
+      "bg": [
+        222,
+        244,
+        228
+      ],
+      "ui": [
+        36,
+        72,
+        66
+      ],
+      "grid": [
+        120,
+        166,
+        148
+      ],
+      "subtitle": [
+        72,
+        110,
+        102
+      ],
+      "label": [
+        36,
+        72,
+        66
+      ],
+      "distress_texture": 2,
+      "object_color_1": [
+        255,
+        190,
+        40
+      ],
+      "object_color_2": [
+        0,
+        210,
+        170
+      ],
+      "is_dark": 0,
+      "fonts": {
+        "title": "Futura-Bold",
+        "subtitle": "Futura-MediumItalic",
+        "label": "Futura-Medium",
+        "tick": "Futura-Medium",
+        "legend": "Futura-Medium",
+        "body": "Futura-Medium"
+      }
+    },
+    {
+      "name": "Blood Moon",
+      "bg": [
+        24,
+        12,
+        14
+      ],
+      "ui": [
+        240,
+        220,
+        210
+      ],
+      "grid": [
+        90,
+        55,
+        60
+      ],
+      "subtitle": [
+        180,
+        145,
+        145
+      ],
+      "label": [
+        255,
+        235,
+        230
+      ],
+      "distress_texture": 4,
+      "object_color_1": [
+        255,
+        220,
+        180
+      ],
+      "object_color_2": [
+        255,
+        120,
+        80
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "Impact",
+        "subtitle": "HelveticaNeue-Medium",
+        "label": "HelveticaNeue-Bold",
+        "tick": "HelveticaNeue",
+        "legend": "HelveticaNeue",
+        "body": "HelveticaNeue"
+      }
+    },
+    {
+      "name": "Retro Terminal",
+      "bg": [
+        10,
+        16,
+        10
+      ],
+      "ui": [
+        170,
+        255,
+        170
+      ],
+      "grid": [
+        48,
+        92,
+        48
+      ],
+      "subtitle": [
+        120,
+        190,
+        120
+      ],
+      "label": [
+        200,
+        255,
+        200
+      ],
+      "distress_texture": 5,
+      "object_color_1": [
+        255,
+        255,
+        120
+      ],
+      "object_color_2": [
+        110,
+        255,
+        140
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "AndaleMono",
+        "subtitle": "AndaleMono",
+        "label": "AndaleMono",
+        "tick": "AndaleMono",
+        "legend": "AndaleMono",
+        "body": "AndaleMono"
+      }
+    },
+    {
+      "name": "Desert Bloom",
+      "bg": [
+        246,
+        214,
+        176
+      ],
+      "ui": [
+        108,
+        72,
+        56
+      ],
+      "grid": [
+        178,
+        136,
+        108
+      ],
+      "subtitle": [
+        128,
+        94,
+        78
+      ],
+      "label": [
+        90,
+        60,
+        48
+      ],
+      "distress_texture": 7,
+      "object_color_1": [
+        180,
+        90,
+        210
+      ],
+      "object_color_2": [
+        255,
+        140,
+        110
+      ],
+      "is_dark": 0,
+      "fonts": {
+        "title": "Optima-Bold",
+        "subtitle": "Optima-Italic",
+        "label": "Optima-Bold",
+        "tick": "Optima-Regular",
+        "legend": "Optima-Regular",
+        "body": "Optima-Regular"
+      }
+    },
+    {
+      "name": "Glacier Ink",
+      "bg": [
+        232,
+        242,
+        248
+      ],
+      "ui": [
+        36,
+        58,
+        74
+      ],
+      "grid": [
+        148,
+        172,
+        188
+      ],
+      "subtitle": [
+        82,
+        102,
+        120
+      ],
+      "label": [
+        36,
+        58,
+        74
+      ],
+      "distress_texture": 6,
+      "object_color_1": [
+        30,
+        30,
+        60
+      ],
+      "object_color_2": [
+        70,
+        180,
+        255
+      ],
+      "is_dark": 0,
+      "fonts": {
+        "title": "Didot-Bold",
+        "subtitle": "Didot-Italic",
+        "label": "Georgia-Bold",
+        "tick": "Georgia",
+        "legend": "Georgia",
+        "body": "Georgia"
+      }
+    },
+    {
+      "name": "Velvet Gold",
+      "bg": [
+        32,
+        24,
+        18
+      ],
+      "ui": [
+        255,
+        228,
+        168
+      ],
+      "grid": [
+        96,
+        78,
+        52
+      ],
+      "subtitle": [
+        188,
+        166,
+        128
+      ],
+      "label": [
+        255,
+        236,
+        188
+      ],
+      "distress_texture": 3,
+      "object_color_1": [
+        190,
+        120,
+        255
+      ],
+      "object_color_2": [
+        255,
+        190,
+        70
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "Didot-Bold",
+        "subtitle": "Optima-Italic",
+        "label": "Optima-Bold",
+        "tick": "Optima-Regular",
+        "legend": "Optima-Regular",
+        "body": "Optima-Regular"
+      }
+    },
+    {
+      "name": "Hospital Sunset",
+      "bg": [
+        244,
+        248,
+        250
+      ],
+      "ui": [
+        74,
+        96,
+        118
+      ],
+      "grid": [
+        188,
+        202,
+        214
+      ],
+      "subtitle": [
+        108,
+        126,
+        142
+      ],
+      "label": [
+        74,
+        96,
+        118
+      ],
+      "distress_texture": 2,
+      "object_color_1": [
+        255,
+        90,
+        140
+      ],
+      "object_color_2": [
+        255,
+        160,
+        120
+      ],
+      "is_dark": 0,
+      "fonts": {
+        "title": "HelveticaNeue-Bold",
+        "subtitle": "HelveticaNeue-Light",
+        "label": "HelveticaNeue-Medium",
+        "tick": "HelveticaNeue",
+        "legend": "HelveticaNeue",
+        "body": "HelveticaNeue"
+      }
+    },
+    {
+      "name": "Nordic Forest",
+      "bg": [
+        18,
+        30,
+        24
+      ],
+      "ui": [
+        214,
+        232,
+        214
+      ],
+      "grid": [
+        72,
+        98,
+        82
+      ],
+      "subtitle": [
+        150,
+        176,
+        158
+      ],
+      "label": [
+        228,
+        240,
+        230
+      ],
+      "distress_texture": 4,
+      "object_color_1": [
+        180,
+        255,
+        210
+      ],
+      "object_color_2": [
+        88,
+        170,
+        120
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "Avenir-Heavy",
+        "subtitle": "Avenir-Book",
+        "label": "Avenir-Medium",
+        "tick": "Avenir-Roman",
+        "legend": "Avenir-Roman",
+        "body": "Avenir-Roman"
+      }
+    },
+    {
+      "name": "Candy Static",
+      "bg": [
+        255,
+        240,
+        250
+      ],
+      "ui": [
+        80,
+        60,
+        90
+      ],
+      "grid": [
+        200,
+        170,
+        190
+      ],
+      "subtitle": [
+        130,
+        100,
+        145
+      ],
+      "label": [
+        80,
+        60,
+        90
+      ],
+      "distress_texture": 1,
+      "object_color_1": [
+        120,
+        220,
+        255
+      ],
+      "object_color_2": [
+        255,
+        120,
+        210
+      ],
+      "is_dark": 0,
+      "fonts": {
+        "title": "Avenir-Black",
+        "subtitle": "Avenir-BookOblique",
+        "label": "Avenir-Heavy",
+        "tick": "Avenir-Medium",
+        "legend": "Avenir-Medium",
+        "body": "Avenir-Roman"
+      }
+    },
+    {
+      "name": "Copper Oxide",
+      "bg": [
+        28,
+        36,
+        34
+      ],
+      "ui": [
+        198,
+        222,
+        210
+      ],
+      "grid": [
+        72,
+        96,
+        92
+      ],
+      "subtitle": [
+        148,
+        172,
+        164
+      ],
+      "label": [
+        220,
+        236,
+        230
+      ],
+      "distress_texture": 6,
+      "object_color_1": [
+        255,
+        150,
+        90
+      ],
+      "object_color_2": [
+        90,
+        210,
+        180
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "Futura-CondensedExtraBold",
+        "subtitle": "Futura-Medium",
+        "label": "Futura-Medium",
+        "tick": "Futura-Medium",
+        "legend": "Futura-Medium",
+        "body": "Futura-Medium"
+      }
+    },
+    {
+      "name": "Solar Monastery",
+      "bg": [
+        236,
+        218,
+        164
+      ],
+      "ui": [
+        76,
+        58,
+        42
+      ],
+      "grid": [
+        154,
+        130,
+        82
+      ],
+      "subtitle": [
+        104,
+        82,
+        58
+      ],
+      "label": [
+        70,
+        52,
+        38
+      ],
+      "distress_texture": 7,
+      "object_color_1": [
+        255,
+        212,
+        74
+      ],
+      "object_color_2": [
+        120,
+        72,
+        42
+      ],
+      "is_dark": 0,
+      "fonts": {
+        "title": "Didot-Bold",
+        "subtitle": "Didot-Italic",
+        "label": "Georgia-Bold",
+        "tick": "Georgia",
+        "legend": "Georgia",
+        "body": "Georgia"
+      }
+    },
+    {
+      "name": "Arctic Signal",
+      "bg": [
+        12,
+        22,
+        32
+      ],
+      "ui": [
+        210,
+        245,
+        255
+      ],
+      "grid": [
+        54,
+        82,
+        102
+      ],
+      "subtitle": [
+        150,
+        196,
+        210
+      ],
+      "label": [
+        232,
+        252,
+        255
+      ],
+      "distress_texture": 5,
+      "object_color_1": [
+        255,
+        255,
+        255
+      ],
+      "object_color_2": [
+        92,
+        255,
+        235
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "HelveticaNeue-Bold",
+        "subtitle": "HelveticaNeue-Light",
+        "label": "HelveticaNeue-Medium",
+        "tick": "HelveticaNeue",
+        "legend": "HelveticaNeue",
+        "body": "HelveticaNeue"
+      }
+    },
+    {
+      "name": "Mango Circuit",
+      "bg": [
+        28,
+        30,
+        24
+      ],
+      "ui": [
+        255,
+        236,
+        180
+      ],
+      "grid": [
+        92,
+        92,
+        66
+      ],
+      "subtitle": [
+        196,
+        182,
+        132
+      ],
+      "label": [
+        255,
+        244,
+        200
+      ],
+      "distress_texture": 1,
+      "object_color_1": [
+        86,
+        255,
+        170
+      ],
+      "object_color_2": [
+        255,
+        176,
+        46
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "AvenirNextCondensed-Bold",
+        "subtitle": "AvenirNextCondensed-Medium",
+        "label": "AvenirNextCondensed-DemiBold",
+        "tick": "AvenirNextCondensed-Regular",
+        "legend": "AvenirNextCondensed-Regular",
+        "body": "AvenirNextCondensed-Regular"
+      }
+    },
+    {
+      "name": "Lavender Archive",
+      "bg": [
+        232,
+        224,
+        238
+      ],
+      "ui": [
+        82,
+        70,
+        98
+      ],
+      "grid": [
+        168,
+        154,
+        180
+      ],
+      "subtitle": [
+        112,
+        96,
+        130
+      ],
+      "label": [
+        72,
+        60,
+        88
+      ],
+      "distress_texture": 2,
+      "object_color_1": [
+        82,
+        138,
+        126
+      ],
+      "object_color_2": [
+        134,
+        112,
+        180
+      ],
+      "is_dark": 0,
+      "fonts": {
+        "title": "Didot-Bold",
+        "subtitle": "Didot-Italic",
+        "label": "Georgia-Bold",
+        "tick": "Georgia",
+        "legend": "Georgia",
+        "body": "Georgia"
+      }
+    },
+    {
+      "name": "Ember Blueprint",
+      "bg": [
+        16,
+        30,
+        44
+      ],
+      "ui": [
+        214,
+        232,
+        244
+      ],
+      "grid": [
+        54,
+        86,
+        112
+      ],
+      "subtitle": [
+        160,
+        186,
+        204
+      ],
+      "label": [
+        230,
+        242,
+        250
+      ],
+      "distress_texture": 6,
+      "object_color_1": [
+        255,
+        104,
+        46
+      ],
+      "object_color_2": [
+        88,
+        170,
+        220
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "AvenirNextCondensed-Bold",
+        "subtitle": "AvenirNextCondensed-Medium",
+        "label": "AvenirNextCondensed-DemiBold",
+        "tick": "AvenirNextCondensed-Regular",
+        "legend": "AvenirNextCondensed-Regular",
+        "body": "AvenirNextCondensed-Regular"
+      }
+    },
+    {
+      "name": "Wasabi Porcelain",
+      "bg": [
+        238,
+        242,
+        226
+      ],
+      "ui": [
+        58,
+        74,
+        66
+      ],
+      "grid": [
+        164,
+        178,
+        150
+      ],
+      "subtitle": [
+        92,
+        108,
+        94
+      ],
+      "label": [
+        54,
+        70,
+        62
+      ],
+      "distress_texture": 2,
+      "object_color_1": [
+        62,
+        122,
+        148
+      ],
+      "object_color_2": [
+        166,
+        198,
+        74
+      ],
+      "is_dark": 0,
+      "fonts": {
+        "title": "HelveticaNeue-Medium",
+        "subtitle": "HelveticaNeue-Thin",
+        "label": "HelveticaNeue-Light",
+        "tick": "HelveticaNeue-Light",
+        "legend": "HelveticaNeue-Light",
+        "body": "HelveticaNeue-Light"
+      }
+    },
+    {
+      "name": "Royal Static",
+      "bg": [
+        22,
+        18,
+        44
+      ],
+      "ui": [
+        234,
+        220,
+        255
+      ],
+      "grid": [
+        76,
+        62,
+        112
+      ],
+      "subtitle": [
+        176,
+        154,
+        216
+      ],
+      "label": [
+        244,
+        236,
+        255
+      ],
+      "distress_texture": 1,
+      "object_color_1": [
+        116,
+        92,
+        255
+      ],
+      "object_color_2": [
+        255,
+        72,
+        196
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "Didot-Bold",
+        "subtitle": "Didot-Italic",
+        "label": "Georgia-Bold",
+        "tick": "Georgia",
+        "legend": "Georgia",
+        "body": "Georgia"
+      }
+    },
+    {
+      "name": "Moss Museum",
+      "bg": [
+        210,
+        206,
+        178
+      ],
+      "ui": [
+        66,
+        74,
+        52
+      ],
+      "grid": [
+        132,
+        136,
+        98
+      ],
+      "subtitle": [
+        88,
+        96,
+        70
+      ],
+      "label": [
+        58,
+        66,
+        48
+      ],
+      "distress_texture": 7,
+      "object_color_1": [
+        178,
+        142,
+        76
+      ],
+      "object_color_2": [
+        84,
+        116,
+        70
+      ],
+      "is_dark": 0,
+      "fonts": {
+        "title": "Didot-Bold",
+        "subtitle": "Didot-Italic",
+        "label": "Georgia-Bold",
+        "tick": "Georgia",
+        "legend": "Georgia",
+        "body": "Georgia"
+      }
+    },
+    {
+      "name": "Infrared Night",
+      "bg": [
+        8,
+        10,
+        14
+      ],
+      "ui": [
+        230,
+        232,
+        238
+      ],
+      "grid": [
+        58,
+        62,
+        72
+      ],
+      "subtitle": [
+        150,
+        158,
+        170
+      ],
+      "label": [
+        238,
+        240,
+        246
+      ],
+      "distress_texture": 3,
+      "object_color_1": [
+        255,
+        58,
+        92
+      ],
+      "object_color_2": [
+        120,
+        255,
+        180
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "Menlo-Bold",
+        "subtitle": "Menlo-Italic",
+        "label": "Menlo-Bold",
+        "tick": "Menlo-Regular",
+        "legend": "Menlo-Regular",
+        "body": "Menlo-Regular"
+      }
+    },
+    {
+      "name": "Sakura Steel",
+      "bg": [
+        226,
+        226,
+        224
+      ],
+      "ui": [
+        64,
+        70,
+        78
+      ],
+      "grid": [
+        152,
+        156,
+        162
+      ],
+      "subtitle": [
+        96,
+        100,
+        108
+      ],
+      "label": [
+        58,
+        64,
+        72
+      ],
+      "distress_texture": 6,
+      "object_color_1": [
+        84,
+        104,
+        126
+      ],
+      "object_color_2": [
+        236,
+        128,
+        170
+      ],
+      "is_dark": 0,
+      "fonts": {
+        "title": "Futura-CondensedExtraBold",
+        "subtitle": "Futura-Medium",
+        "label": "Futura-Medium",
+        "tick": "Futura-Medium",
+        "legend": "Futura-Medium",
+        "body": "Futura-Medium"
+      }
+    },
+    {
+      "name": "Canyon Mirage",
+      "bg": [
+        240,
+        202,
+        154
+      ],
+      "ui": [
+        94,
+        62,
+        48
+      ],
+      "grid": [
+        170,
+        118,
+        88
+      ],
+      "subtitle": [
+        118,
+        82,
+        64
+      ],
+      "label": [
+        82,
+        54,
+        42
+      ],
+      "distress_texture": 7,
+      "object_color_1": [
+        70,
+        180,
+        196
+      ],
+      "object_color_2": [
+        224,
+        104,
+        62
+      ],
+      "is_dark": 0,
+      "fonts": {
+        "title": "Optima-Bold",
+        "subtitle": "Optima-Italic",
+        "label": "Optima-Bold",
+        "tick": "Optima-Regular",
+        "legend": "Optima-Regular",
+        "body": "Optima-Regular"
+      }
+    },
+    {
+      "name": "Petroleum Glow",
+      "bg": [
+        10,
+        20,
+        24
+      ],
+      "ui": [
+        208,
+        232,
+        224
+      ],
+      "grid": [
+        54,
+        82,
+        78
+      ],
+      "subtitle": [
+        142,
+        174,
+        168
+      ],
+      "label": [
+        226,
+        244,
+        238
+      ],
+      "distress_texture": 5,
+      "object_color_1": [
+        244,
+        210,
+        86
+      ],
+      "object_color_2": [
+        40,
+        188,
+        178
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "Futura-CondensedExtraBold",
+        "subtitle": "Futura-Medium",
+        "label": "Futura-Medium",
+        "tick": "Futura-Medium",
+        "legend": "Futura-Medium",
+        "body": "Futura-Medium"
+      }
+    },
+    {
+      "name": "RSG",
+      "bg": [
+        232,
+        242,
+        248
+      ],
+      "ui": [
+        36,
+        58,
+        74
+      ],
+      "grid": [
+        148,
+        172,
+        188
+      ],
+      "subtitle": [
+        82,
+        102,
+        120
+      ],
+      "label": [
+        36,
+        58,
+        74
+      ],
+      "distress_texture": 8,
+      "object_color_1": [
+        30,
+        30,
+        60
+      ],
+      "object_color_2": [
+        70,
+        180,
+        255
+      ],
+      "is_dark": 0,
+      "fonts": {
+        "title": "Helvetica-Bold",
+        "subtitle": "Helvetica",
+        "label": "Helvetica-Bold",
+        "tick": "Helvetica",
+        "legend": "Helvetica",
+        "body": "Helvetica"
+      }
+    },
+    {
+      "name": "RSG Dark",
+      "bg": [
+        18,
+        28,
+        38
+      ],
+      "ui": [
+        220,
+        235,
+        245
+      ],
+      "grid": [
+        45,
+        65,
+        82
+      ],
+      "subtitle": [
+        148,
+        172,
+        192
+      ],
+      "label": [
+        220,
+        235,
+        245
+      ],
+      "distress_texture": 8,
+      "object_color_1": [
+        180,
+        200,
+        220
+      ],
+      "object_color_2": [
+        70,
+        180,
+        255
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "Helvetica-Bold",
+        "subtitle": "Helvetica",
+        "label": "Helvetica-Bold",
+        "tick": "Helvetica",
+        "legend": "Helvetica",
+        "body": "Helvetica"
+      }
+    },
+    {
+      "name": "Plasma Field",
+      "bg": [
+        13,
+        8,
+        30
+      ],
+      "ui": [
+        232,
+        224,
+        245
+      ],
+      "grid": [
+        70,
+        55,
+        95
+      ],
+      "subtitle": [
+        180,
+        165,
+        205
+      ],
+      "label": [
+        240,
+        234,
+        250
+      ],
+      "distress_texture": 1,
+      "object_color_1": [
+        244,
+        226,
+        84
+      ],
+      "object_color_2": [
+        134,
+        42,
+        162
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "Futura-Bold",
+        "subtitle": "Futura-MediumItalic",
+        "label": "Futura-Medium",
+        "tick": "Futura-Medium",
+        "legend": "Futura-Medium",
+        "body": "Futura-Medium"
+      }
+    },
+    {
+      "name": "Viridis Lab",
+      "bg": [
+        16,
+        24,
+        28
+      ],
+      "ui": [
+        222,
+        235,
+        225
+      ],
+      "grid": [
+        56,
+        78,
+        76
+      ],
+      "subtitle": [
+        150,
+        180,
+        170
+      ],
+      "label": [
+        232,
+        242,
+        236
+      ],
+      "distress_texture": 5,
+      "object_color_1": [
+        200,
+        225,
+        70
+      ],
+      "object_color_2": [
+        62,
+        52,
+        110
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "Menlo-Bold",
+        "subtitle": "Menlo-Italic",
+        "label": "Menlo-Bold",
+        "tick": "Menlo-Regular",
+        "legend": "Menlo-Regular",
+        "body": "Menlo-Regular"
+      }
+    },
+    {
+      "name": "Magma",
+      "bg": [
+        10,
+        6,
+        12
+      ],
+      "ui": [
+        240,
+        225,
+        220
+      ],
+      "grid": [
+        80,
+        50,
+        55
+      ],
+      "subtitle": [
+        190,
+        150,
+        150
+      ],
+      "label": [
+        250,
+        238,
+        232
+      ],
+      "distress_texture": 3,
+      "object_color_1": [
+        255,
+        236,
+        124
+      ],
+      "object_color_2": [
+        140,
+        30,
+        62
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "Impact",
+        "subtitle": "HelveticaNeue-Medium",
+        "label": "HelveticaNeue-Bold",
+        "tick": "HelveticaNeue",
+        "legend": "HelveticaNeue",
+        "body": "HelveticaNeue"
+      }
+    },
+    {
+      "name": "Aurora Veil",
+      "bg": [
+        8,
+        18,
+        26
+      ],
+      "ui": [
+        216,
+        242,
+        238
+      ],
+      "grid": [
+        50,
+        84,
+        86
+      ],
+      "subtitle": [
+        150,
+        196,
+        196
+      ],
+      "label": [
+        232,
+        250,
+        246
+      ],
+      "distress_texture": 5,
+      "object_color_1": [
+        255,
+        120,
+        200
+      ],
+      "object_color_2": [
+        90,
+        235,
+        180
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "HelveticaNeue-Medium",
+        "subtitle": "HelveticaNeue-Thin",
+        "label": "HelveticaNeue-Light",
+        "tick": "HelveticaNeue-Light",
+        "legend": "HelveticaNeue-Light",
+        "body": "HelveticaNeue-Light"
+      }
+    },
+    {
+      "name": "Spectral Dusk",
+      "bg": [
+        20,
+        22,
+        32
+      ],
+      "ui": [
+        224,
+        228,
+        236
+      ],
+      "grid": [
+        62,
+        68,
+        84
+      ],
+      "subtitle": [
+        160,
+        168,
+        186
+      ],
+      "label": [
+        236,
+        238,
+        244
+      ],
+      "distress_texture": 6,
+      "object_color_1": [
+        255,
+        150,
+        70
+      ],
+      "object_color_2": [
+        80,
+        150,
+        235
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "HelveticaNeue-Medium",
+        "subtitle": "HelveticaNeue-Thin",
+        "label": "HelveticaNeue-Light",
+        "tick": "HelveticaNeue-Light",
+        "legend": "HelveticaNeue-Light",
+        "body": "HelveticaNeue-Light"
+      }
+    },
+    {
+      "name": "Citrus Grove",
+      "bg": [
+        246,
+        244,
+        228
+      ],
+      "ui": [
+        70,
+        82,
+        52
+      ],
+      "grid": [
+        168,
+        176,
+        140
+      ],
+      "subtitle": [
+        104,
+        116,
+        80
+      ],
+      "label": [
+        60,
+        72,
+        44
+      ],
+      "distress_texture": 7,
+      "object_color_1": [
+        238,
+        140,
+        48
+      ],
+      "object_color_2": [
+        120,
+        180,
+        70
+      ],
+      "is_dark": 0,
+      "fonts": {
+        "title": "GillSans-Bold",
+        "subtitle": "GillSans-LightItalic",
+        "label": "GillSans-SemiBold",
+        "tick": "GillSans",
+        "legend": "GillSans",
+        "body": "GillSans"
+      }
+    },
+    {
+      "name": "Tidal Glass",
+      "bg": [
+        234,
+        242,
+        246
+      ],
+      "ui": [
+        40,
+        58,
+        74
+      ],
+      "grid": [
+        150,
+        172,
+        186
+      ],
+      "subtitle": [
+        88,
+        110,
+        128
+      ],
+      "label": [
+        36,
+        54,
+        70
+      ],
+      "distress_texture": 6,
+      "object_color_1": [
+        70,
+        90,
+        200
+      ],
+      "object_color_2": [
+        60,
+        190,
+        200
+      ],
+      "is_dark": 0,
+      "fonts": {
+        "title": "HelveticaNeue-Medium",
+        "subtitle": "HelveticaNeue-Thin",
+        "label": "HelveticaNeue-Light",
+        "tick": "HelveticaNeue-Light",
+        "legend": "HelveticaNeue-Light",
+        "body": "HelveticaNeue-Light"
+      }
+    },
+    {
+      "name": "Coral Reef",
+      "bg": [
+        240,
+        244,
+        244
+      ],
+      "ui": [
+        44,
+        66,
+        68
+      ],
+      "grid": [
+        156,
+        180,
+        180
+      ],
+      "subtitle": [
+        96,
+        124,
+        126
+      ],
+      "label": [
+        40,
+        62,
+        64
+      ],
+      "distress_texture": 2,
+      "object_color_1": [
+        255,
+        110,
+        110
+      ],
+      "object_color_2": [
+        60,
+        196,
+        196
+      ],
+      "is_dark": 0,
+      "fonts": {
+        "title": "GillSans-Bold",
+        "subtitle": "GillSans-LightItalic",
+        "label": "GillSans-SemiBold",
+        "tick": "GillSans",
+        "legend": "GillSans",
+        "body": "GillSans"
+      }
+    },
+    {
+      "name": "Neon Noir",
+      "bg": [
+        9,
+        10,
+        20
+      ],
+      "ui": [
+        236,
+        242,
+        255
+      ],
+      "grid": [
+        58,
+        64,
+        96
+      ],
+      "subtitle": [
+        170,
+        182,
+        225
+      ],
+      "label": [
+        246,
+        248,
+        255
+      ],
+      "distress_texture": 1,
+      "object_color_1": [
+        255,
+        76,
+        190
+      ],
+      "object_color_2": [
+        48,
+        232,
+        255
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "HelveticaNeue-CondensedBlack",
+        "subtitle": "HelveticaNeue-Medium",
+        "label": "HelveticaNeue-CondensedBold",
+        "tick": "HelveticaNeue",
+        "legend": "HelveticaNeue",
+        "body": "HelveticaNeue"
+      }
+    },
+    {
+      "name": "Moonlit Jade",
+      "bg": [
+        11,
+        25,
+        27
+      ],
+      "ui": [
+        218,
+        245,
+        232
+      ],
+      "grid": [
+        52,
+        92,
+        84
+      ],
+      "subtitle": [
+        160,
+        208,
+        190
+      ],
+      "label": [
+        232,
+        255,
+        242
+      ],
+      "distress_texture": 5,
+      "object_color_1": [
+        190,
+        255,
+        145
+      ],
+      "object_color_2": [
+        70,
+        190,
+        185
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "AvenirNext-Bold",
+        "subtitle": "AvenirNext-Italic",
+        "label": "AvenirNext-DemiBold",
+        "tick": "AvenirNext-Regular",
+        "legend": "AvenirNext-Regular",
+        "body": "AvenirNext-Regular"
+      }
+    },
+    {
+      "name": "Peach Blueprint",
+      "bg": [
+        248,
+        230,
+        214
+      ],
+      "ui": [
+        54,
+        72,
+        112
+      ],
+      "grid": [
+        146,
+        164,
+        194
+      ],
+      "subtitle": [
+        84,
+        100,
+        140
+      ],
+      "label": [
+        54,
+        72,
+        112
+      ],
+      "distress_texture": 2,
+      "object_color_1": [
+        238,
+        112,
+        86
+      ],
+      "object_color_2": [
+        66,
+        136,
+        196
+      ],
+      "is_dark": 0,
+      "fonts": {
+        "title": "AvenirNextCondensed-Bold",
+        "subtitle": "AvenirNextCondensed-Medium",
+        "label": "AvenirNextCondensed-DemiBold",
+        "tick": "AvenirNextCondensed-Regular",
+        "legend": "AvenirNextCondensed-Regular",
+        "body": "AvenirNextCondensed-Regular"
+      }
+    },
+    {
+      "name": "Electric Coral",
+      "bg": [
+        26,
+        18,
+        30
+      ],
+      "ui": [
+        255,
+        230,
+        218
+      ],
+      "grid": [
+        96,
+        62,
+        92
+      ],
+      "subtitle": [
+        218,
+        172,
+        190
+      ],
+      "label": [
+        255,
+        240,
+        230
+      ],
+      "distress_texture": 4,
+      "object_color_1": [
+        255,
+        112,
+        92
+      ],
+      "object_color_2": [
+        105,
+        225,
+        235
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "Futura-Bold",
+        "subtitle": "Futura-MediumItalic",
+        "label": "Futura-Medium",
+        "tick": "Futura-Medium",
+        "legend": "Futura-Medium",
+        "body": "Futura-Medium"
+      }
+    },
+    {
+      "name": "Cloud Laboratory",
+      "bg": [
+        244,
+        248,
+        250
+      ],
+      "ui": [
+        42,
+        58,
+        76
+      ],
+      "grid": [
+        174,
+        188,
+        204
+      ],
+      "subtitle": [
+        86,
+        102,
+        120
+      ],
+      "label": [
+        42,
+        58,
+        76
+      ],
+      "distress_texture": null,
+      "object_color_1": [
+        80,
+        118,
+        235
+      ],
+      "object_color_2": [
+        38,
+        190,
+        170
+      ],
+      "is_dark": 0,
+      "fonts": {
+        "title": "HelveticaNeue-Medium",
+        "subtitle": "HelveticaNeue-Thin",
+        "label": "HelveticaNeue-Light",
+        "tick": "HelveticaNeue-Light",
+        "legend": "HelveticaNeue-Light",
+        "body": "HelveticaNeue-Light"
+      }
+    },
+    {
+      "name": "Obsidian Sakura",
+      "bg": [
+        15,
+        14,
+        20
+      ],
+      "ui": [
+        245,
+        232,
+        240
+      ],
+      "grid": [
+        76,
+        64,
+        82
+      ],
+      "subtitle": [
+        196,
+        168,
+        188
+      ],
+      "label": [
+        255,
+        240,
+        248
+      ],
+      "distress_texture": 1,
+      "object_color_1": [
+        255,
+        152,
+        196
+      ],
+      "object_color_2": [
+        132,
+        120,
+        255
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "Didot-Bold",
+        "subtitle": "Didot-Italic",
+        "label": "Georgia-Bold",
+        "tick": "Georgia",
+        "legend": "Georgia",
+        "body": "Georgia"
+      }
+    },
+    {
+      "name": "Chalkboard",
+      "bg": [
+        2,
+        32,
+        4
+      ],
+      "ui": [
+        236,
+        240,
+        230
+      ],
+      "grid": [
+        74,
+        102,
+        78
+      ],
+      "subtitle": [
+        188,
+        208,
+        188
+      ],
+      "label": [
+        240,
+        244,
+        234
+      ],
+      "distress_texture": 4,
+      "object_color_1": [
+        240,
+        224,
+        120
+      ],
+      "object_color_2": [
+        124,
+        198,
+        232
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "ChalkboardSE-Bold",
+        "subtitle": "ChalkboardSE-Light",
+        "label": "ChalkboardSE-Regular",
+        "tick": "ChalkboardSE-Light",
+        "legend": "ChalkboardSE-Regular",
+        "body": "ChalkboardSE-Light"
+      }
+    },
+    {
+      "name": "Duke Light",
+      "bg": [
+        255,
+        255,
+        255
+      ],
+      "ui": [
+        1,
+        33,
+        105
+      ],
+      "grid": [
+        190,
+        198,
+        212
+      ],
+      "subtitle": [
+        0,
+        83,
+        155
+      ],
+      "label": [
+        1,
+        33,
+        105
+      ],
+      "distress_texture": null,
+      "object_color_1": [
+        0,
+        83,
+        155
+      ],
+      "object_color_2": [
+        1,
+        33,
+        105
+      ],
+      "is_dark": 0,
+      "fonts": {
+        "title": "Didot-Bold",
+        "subtitle": "Didot-Italic",
+        "label": "Georgia-Bold",
+        "tick": "Georgia",
+        "legend": "Georgia",
+        "body": "Georgia"
+      }
+    },
+    {
+      "name": "Duke Dark",
+      "bg": [
+        7,
+        12,
+        26
+      ],
+      "ui": [
+        238,
+        242,
+        250
+      ],
+      "grid": [
+        40,
+        54,
+        86
+      ],
+      "subtitle": [
+        90,
+        160,
+        225
+      ],
+      "label": [
+        244,
+        247,
+        252
+      ],
+      "distress_texture": null,
+      "object_color_1": [
+        90,
+        160,
+        225
+      ],
+      "object_color_2": [
+        255,
+        255,
+        255
+      ],
+      "is_dark": 1,
+      "fonts": {
+        "title": "Didot-Bold",
+        "subtitle": "Didot-Italic",
+        "label": "Georgia-Bold",
+        "tick": "Georgia",
+        "legend": "Georgia",
+        "body": "Georgia"
+      }
+    }
+  ]
+}
