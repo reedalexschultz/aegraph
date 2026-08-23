@@ -583,7 +583,9 @@ class AEGraph:
                  label_color=UNSET,
                  subtitle_color=UNSET,
                  grid_color=UNSET,
+                 grid_linewidth=UNSET,
                  theme=None,
+                 tick_format=None,
                  view_keyframes=None):
         """
         Initialize a new AEGraph instance.
@@ -652,6 +654,15 @@ class AEGraph:
                 if in range, else left), ``'left'``, ``'right'``, or an x data value.
             plot_frame (bool): If True, draw the top and right spines opposite the primary
                 x/y axes so the plot area is a full rectangle (matplotlib-style box).
+            tick_format (str, optional): Compact numeric tick labels for auto-generated
+                axis and colorbar ticks. ``None`` (default) prints numbers as-is.
+                ``"K"`` shows thousands (``100000`` → ``100K``), ``"M"`` millions,
+                ``"B"`` billions, ``"si"`` picks K/M/B per value. Explicit label
+                lists on ``set_xticks``/``set_yticks`` still win. Per-axis override:
+                ``set_yticks(tick_format="K")``.
+            grid_linewidth (float): Grid line stroke width in pixels. Defaults to
+                ``aegraph_config.config.grid_linewidth`` (1.0). Override per chart
+                with ``.grid(linewidth=...)``.
         """
         # Sizing resolution (backward-compatible):
         # - Comp: explicit compwidth/compheight > comp_width/comp_height > graph
@@ -732,10 +743,15 @@ class AEGraph:
             self.set_view_keyframes(view_keyframes)
         self.xticks = None  # X-axis tick positions and labels
         self.yticks = None  # Y-axis tick positions and labels
+        self.xtick_rotation = 0.0  # degrees; nonzero tilts x-tick labels (bar-chart category names)
+        self.xtick_fontsize = None  # optional px override for x-tick labels only
+        self.xtick_color = None  # optional color override for x-tick labels only
         self.show_grid = False   # Whether to show grid (call .grid() to enable)
         self.grid_color = config.grid_color if grid_color is UNSET else grid_color
         self.grid_alpha = 0.3     # Grid opacity
-        self.grid_linewidth = config.grid_linewidth
+        self.grid_linewidth = (
+            config.grid_linewidth if grid_linewidth is UNSET else float(grid_linewidth)
+        )
         self.grid_linestyle = "dashed"  # Grid line style (default: dashed)
         self.grid_dash_size = config.dash_size  # Grid dash size scale factor
         self.hide_horizontal = False  # Hide horizontal grid lines
@@ -791,6 +807,9 @@ class AEGraph:
         self.font_body = _resolve_font(font_body, "font_body")
         # Tick formatting flags
         self.percent_tick_labels = False  # When True, x-ticks render as absolute percentages
+        self.tick_format = self._normalize_tick_format(tick_format)
+        self._xtick_format = None  # per-axis override; None falls back to tick_format
+        self._ytick_format = None
         self._xtick_labels_auto = False
         self._ytick_labels_auto = False
         # On log axes, decade labels whose exponent magnitude is >= this
@@ -2115,7 +2134,7 @@ class AEGraph:
             self.legend.append(label)
         return self
 
-    def bar_graph(self, x_values, heights, bar_width=None, color=UNSET, label=None, alpha=0.8, animate=1.0, drop_shadow=False, bar_anim_times=UNSET, ease_speed=None, ease_influence=None, meta_easy_ease=None, meta_ease_speed=None, meta_ease_influence=None, c=None, gradient=None, discrete=None, bottom=None, colorbar=True, x_pad=None, **kwargs):
+    def bar_graph(self, x_values, heights, bar_width=None, color=UNSET, label=None, alpha=0.8, animate=1.0, drop_shadow=False, bar_anim_times=UNSET, ease_speed=None, ease_influence=None, meta_easy_ease=None, meta_ease_speed=None, meta_ease_influence=None, c=None, gradient=None, discrete=None, bottom=None, colorbar=True, x_pad=None, xtick_rotation=None, **kwargs):
         """
         Add a bar graph to the plot using x values and corresponding heights.
         x_values: 1D array-like x positions for bars.
@@ -2156,7 +2175,13 @@ class AEGraph:
             bars.  Pass ``0`` for bars flush against the axis edge, or a
             positive value for extra breathing room.  Has no effect when
             ``set_xlim()`` is also called (the explicit limit takes priority).
+        xtick_rotation: Degrees to rotate x-tick labels so category names
+            (e.g. full state names) can sit on a diagonal instead of overlapping.
+            Negative values tilt clockwise, which is the usual bar-chart look
+            (``-45``). ``None`` leaves the current ``xtick_rotation`` unchanged.
         """
+        if xtick_rotation is not None:
+            self.xtick_rotation = float(xtick_rotation)
         if bar_anim_times is UNSET:
             bar_anim_times = config.bar_anim_times
         x_name = getattr(x_values, "name", None) if pd is not None and isinstance(x_values, pd.Series) else None
@@ -4565,7 +4590,7 @@ class AEGraph:
             fmt = "{:.1f}%" if abs(step0) < 1 else "{:.0f}%"
             labels = [fmt.format(abs(p)) for p in positions]
         else:
-            labels = [self._format_tick_label(p, scale) for p in positions]
+            labels = [self._format_tick_label(p, scale, axis=axis) for p in positions]
         thresholds = [step * target_n for step in ladder]
 
         if axis == "x":
@@ -5401,11 +5426,11 @@ class AEGraph:
                 else:
                     labels = [f"{abs(pos):.0f}%" for pos in positions]
             else:
-                labels = [self._format_tick_label(pos, self.xscale) for pos in positions]
+                labels = [self._format_tick_label(pos, self.xscale, axis="x") for pos in positions]
             self.xticks = list(zip(positions, labels))
         else:
             self._ytick_labels_auto = True
-            labels = [self._format_tick_label(pos, self.yscale) for pos in positions]
+            labels = [self._format_tick_label(pos, self.yscale, axis="y") for pos in positions]
             self.yticks = list(zip(positions, labels))
 
     def _filter_ticks_to_view(self, positions, vmin, vmax, scale: str):
@@ -5449,10 +5474,31 @@ class AEGraph:
         self.legend_pos = legend_pos
         return self
 
-    def set_xticks(self, positions=None, labels=None, nticks=7):
+    def set_xticks(self, positions=None, labels=None, nticks=7, rotation=None, fontsize=None, color=None, tick_format=UNSET):
         """
         Set X-axis tick positions and labels.
+
+        rotation: Optional label angle in degrees. Negative tilts clockwise
+            (``-45`` for diagonal bar-chart category names). ``None`` leaves
+            the current ``xtick_rotation`` unchanged.
+        fontsize: Optional x-tick label size in pixels. Other text (title,
+            axis labels, y-ticks) still follows ``font_scale``. ``None``
+            leaves the current ``xtick_fontsize`` unchanged.
+        color: Optional x-tick label color (name or RGB). ``None`` leaves
+            the current ``xtick_color`` unchanged (default: the graph ui color).
+        tick_format: Optional compact numeric format for auto-generated labels
+            (``"K"``, ``"M"``, ``"B"``, ``"si"``). Overrides the constructor
+            ``tick_format`` for this axis. Ignored when ``labels`` is given.
+            ``None`` clears the per-axis override.
         """
+        if rotation is not None:
+            self.xtick_rotation = float(rotation)
+        if fontsize is not None:
+            self.xtick_fontsize = float(fontsize)
+        if color is not None:
+            self.xtick_color = color
+        if tick_format is not UNSET:
+            self._xtick_format = self._normalize_tick_format(tick_format)
         self._xtick_labels_auto = labels is None
         scale = self._normalize_scale(self.xscale)
         positive_x = []
@@ -5496,7 +5542,7 @@ class AEGraph:
                 else:
                     labels = [f"{abs(pos):.0f}%" for pos in positions]
             else:
-                labels = [self._format_tick_label(pos, self.xscale) for pos in positions]
+                labels = [self._format_tick_label(pos, self.xscale, axis="x") for pos in positions]
         else:
             labels = list(labels)
             if len(labels) != len(positions):
@@ -5505,10 +5551,21 @@ class AEGraph:
         self.xticks = list(zip(positions, labels))
         return self
 
-    def set_yticks(self, positions=None, labels=None, nticks=7):
+    def set_yticks(self, positions=None, labels=None, nticks=7, tick_format=UNSET):
         """
         Set Y-axis tick positions and labels.
+
+        Omit ``positions`` (and ``labels``) to let AEGraph pick nice ticks for
+        the current view. With ``set_view_keyframes`` that uses the adaptive,
+        zoom-aware tick set so labels stay in range as the window changes.
+
+        tick_format: Optional compact numeric format for auto-generated labels
+            (``"K"``, ``"M"``, ``"B"``, ``"si"``). Overrides the constructor
+            ``tick_format`` for this axis. Ignored when ``labels`` is given.
+            ``None`` clears the per-axis override.
         """
+        if tick_format is not UNSET:
+            self._ytick_format = self._normalize_tick_format(tick_format)
         self._ytick_labels_auto = labels is None
         scale = self._normalize_scale(self.yscale)
         positive_y = []
@@ -5545,7 +5602,7 @@ class AEGraph:
         positions = self._sanitize_tick_positions(positions, scale)
 
         if labels is None:
-            labels = [self._format_tick_label(pos, self.yscale) for pos in positions]
+            labels = [self._format_tick_label(pos, self.yscale, axis="y") for pos in positions]
         else:
             labels = list(labels)
             if len(labels) != len(positions):
@@ -5812,8 +5869,13 @@ class AEGraph:
         Returns (y, anchor_at_top). Tick labels are accounted for so the title sits
         just outside them, not at a fixed offset from the plot frame edge.
         """
-        tick_fs = int(27 * self.font_scale)
+        tick_fs = int(self.xtick_fontsize) if getattr(self, "xtick_fontsize", None) else int(27 * self.font_scale)
         tick_text_h = tick_fs * 1.12
+        xtick_rot = abs(float(getattr(self, "xtick_rotation", 0) or 0))
+        if xtick_rot and self.xticks:
+            max_chars = max((len(str(lbl)) for _pos, lbl in self.xticks), default=1)
+            label_w = max_chars * tick_fs * 0.58
+            tick_text_h = max(tick_text_h, abs(math.sin(math.radians(xtick_rot))) * label_w)
         xlabel_gap = max(6.0, 10.0 * self.font_scale)
         tick_label_gap = self._tick_label_gap()
         x_labels_below = self._x_tick_labels_below_axis(x_axis_y, ymin_pad, ymax_pad)
@@ -5878,7 +5940,7 @@ class AEGraph:
                 if self._normalize_scale(self.yscale) == "log" and pos <= 0:
                     continue
                 if self._ytick_labels_auto:
-                    label = self._format_tick_label(pos, self.yscale)
+                    label = self._format_tick_label(pos, self.yscale, axis="y")
                 if not str(label).strip():
                     continue
                 tick_xs0, _tick_ys, tick_xs1, _u = self._y_tick_shape_coords(
@@ -6268,7 +6330,78 @@ class AEGraph:
         }
         return "".join(supers.get(ch, ch) for ch in str(exp))
 
-    def _format_tick_label(self, value, scale: str) -> str:
+    _TICK_FORMAT_SCALES = {
+        "k": (1_000.0, "K"),
+        "m": (1_000_000.0, "M"),
+        "b": (1_000_000_000.0, "B"),
+    }
+
+    @staticmethod
+    def _normalize_tick_format(fmt):
+        """Normalize a tick_format value to ``None`` or ``'k'|'m'|'b'|'si'``."""
+        if fmt is None:
+            return None
+        key = str(fmt).strip().lower()
+        if key in ("", "none", "plain", "default"):
+            return None
+        aliases = {
+            "k": "k", "thousand": "k", "thousands": "k",
+            "m": "m", "million": "m", "millions": "m",
+            "b": "b", "billion": "b", "billions": "b",
+            "si": "si", "compact": "si",
+        }
+        if key not in aliases:
+            raise ValueError(
+                "tick_format must be None, 'K', 'M', 'B', or 'si'; "
+                f"got {fmt!r}"
+            )
+        return aliases[key]
+
+    def _tick_format_for_axis(self, axis=None):
+        """Resolved compact tick format for an axis (per-axis override, then graph)."""
+        if axis == "x":
+            override = getattr(self, "_xtick_format", None)
+            if override is not None:
+                return override
+        elif axis == "y":
+            override = getattr(self, "_ytick_format", None)
+            if override is not None:
+                return override
+        return getattr(self, "tick_format", None)
+
+    @staticmethod
+    def _format_scaled_tick(value, divisor, suffix):
+        """``100000``, divisor 1000, suffix ``K`` → ``100K``."""
+        scaled = float(value) / divisor
+        if abs(scaled) < 1e-12:
+            return "0"
+        if abs(scaled - round(scaled)) < 1e-9:
+            return f"{int(round(scaled))}{suffix}"
+        text = f"{scaled:.1f}".rstrip("0").rstrip(".")
+        return f"{text}{suffix}"
+
+    def _format_compact_tick(self, value, fmt):
+        """Apply a compact ``tick_format``; return None to fall back to plain."""
+        fmt = self._normalize_tick_format(fmt)
+        if fmt is None:
+            return None
+        value = float(value)
+        if fmt == "si":
+            abs_v = abs(value)
+            if abs_v >= 1_000_000_000:
+                fmt = "b"
+            elif abs_v >= 1_000_000:
+                fmt = "m"
+            elif abs_v >= 1_000:
+                fmt = "k"
+            else:
+                return None
+        divisor, suffix = self._TICK_FORMAT_SCALES[fmt]
+        if abs(value) < divisor:
+            return None
+        return self._format_scaled_tick(value, divisor, suffix)
+
+    def _format_tick_label(self, value, scale: str, axis=None) -> str:
         """Format tick label text (decade labels on log axes: 1, 10, 100, …).
 
         On log axes, decade labels whose exponent magnitude is at least
@@ -6277,6 +6410,9 @@ class AEGraph:
         ``1000`` -> ``10³``, ``0.0001`` -> ``10⁻⁴``). With the default
         threshold of 1 every decade uses this power notation (1 stays ``1``);
         raise the threshold to keep small decades spelled out.
+
+        On linear axes, ``tick_format`` (``"K"``, ``"M"``, ``"B"``, ``"si"``)
+        compactly suffixes thousands and above (``100000`` → ``100K``).
         """
         scale = AEGraph._normalize_scale(scale)
         if scale == "log":
@@ -6297,6 +6433,9 @@ class AEGraph:
                 # 0.1, 0.01, …
                 return f"{10.0 ** exp:g}"
             return f"{value:g}"
+        compact = self._format_compact_tick(value, self._tick_format_for_axis(axis))
+        if compact is not None:
+            return compact
         if isinstance(value, float) and value == int(value):
             return str(int(value))
         return str(value)
@@ -6932,7 +7071,7 @@ class AEGraph:
                 if self._normalize_scale(self.xscale) == "log" and pos <= 0:
                     continue
                 if self._xtick_labels_auto:
-                    label = self._format_tick_label(pos, self.xscale)
+                    label = self._format_tick_label(pos, self.xscale, axis="x")
                 if not str(label).strip():
                     continue
                 pos_var = str(pos).replace('-', 'm').replace('.', '_')
@@ -6988,34 +7127,52 @@ class AEGraph:
                 # Tick label beside the tick (below or above spine depending on xaxis_location)
                 if self.show_tick_labels:
                     lx, _ = self._data_to_shape(pos, x_axis_y, xmin_pad, xmax_pad, ymin_pad, ymax_pad)
+                    xtick_rot = float(getattr(self, "xtick_rotation", 0) or 0)
+                    extra_gap = 4.0 if abs(xtick_rot) > 1 else 0.0
                     if x_labels_below:
-                        label_ly = max(tick_ys0, tick_ys1) + tick_label_gap
-                        anchor_js = f"[xsr{pos_var}.left + xsr{pos_var}.width/2, xsr{pos_var}.top]"
+                        label_ly = max(tick_ys0, tick_ys1) + tick_label_gap + extra_gap
+                        if abs(xtick_rot) > 1:
+                            anchor_js = f"[xsr{pos_var}.left + xsr{pos_var}.width, xsr{pos_var}.top]"
+                        else:
+                            anchor_js = f"[xsr{pos_var}.left + xsr{pos_var}.width/2, xsr{pos_var}.top]"
                     else:
-                        label_ly = min(tick_ys0, tick_ys1) - tick_label_gap
-                        anchor_js = f"[xsr{pos_var}.left + xsr{pos_var}.width/2, xsr{pos_var}.top + xsr{pos_var}.height]"
-                    script.append(f"var xtickLabel{pos_var} = comp.layers.addText(\"{label}\");\n")
+                        label_ly = min(tick_ys0, tick_ys1) - tick_label_gap - extra_gap
+                        if abs(xtick_rot) > 1:
+                            anchor_js = f"[xsr{pos_var}.left + xsr{pos_var}.width, xsr{pos_var}.top + xsr{pos_var}.height]"
+                        else:
+                            anchor_js = f"[xsr{pos_var}.left + xsr{pos_var}.width/2, xsr{pos_var}.top + xsr{pos_var}.height]"
+                    label_js = str(label).replace("\\", "\\\\").replace('"', '\\"')
+                    script.append(f"var xtickLabel{pos_var} = comp.layers.addText(\"{label_js}\");\n")
                     script.append(f"xtickLabel{pos_var}.property('Transform').property('Position').setValue([{center_x + lx}, {center_y + label_ly}]);\n")
                     script.append(f"xtickLabel{pos_var}.parent = PlotAnchor;\n")
                     if self._view_animated:
                         script.append(f"var xtickLabelPos{pos_var} = xtickLabel{pos_var}.property('Transform').property('Position');\n")
-                        def _xlabel_geom(xmn, xmx, ymn, ymx, _pos=pos, _below=x_labels_below, _gap=tick_label_gap):
+                        def _xlabel_geom(xmn, xmx, ymn, ymx, _pos=pos, _below=x_labels_below, _gap=tick_label_gap, _extra=extra_gap):
                             xay = self._resolve_xaxis_y(ymn, ymx, has_barh)
                             txs, tys0, _u, tys1 = self._x_tick_shape_coords(_pos, xay, xmn, xmx, ymn, ymx)
                             llx = self._data_to_shape(_pos, xay, xmn, xmx, ymn, ymx)[0]
-                            lly = (max(tys0, tys1) + _gap) if _below else (min(tys0, tys1) - _gap)
+                            lly = (max(tys0, tys1) + _gap + _extra) if _below else (min(tys0, tys1) - _gap - _extra)
                             return (llx, lly)
                         self._emit_view_pos_kf(script, f"xtickLabelPos{pos_var}", _xlabel_geom)
                     script.append(f"var xtickLabelProp{pos_var} = xtickLabel{pos_var}.property('Source Text');\n")
                     script.append(f"var xtickLabelDoc{pos_var} = xtickLabelProp{pos_var}.value;\n")
-                    script.append(f"xtickLabelDoc{pos_var}.fontSize = {int(27 * self.font_scale)};\n")
+                    xtick_fs = int(self.xtick_fontsize) if getattr(self, "xtick_fontsize", None) else int(27 * self.font_scale)
+                    script.append(f"xtickLabelDoc{pos_var}.fontSize = {xtick_fs};\n")
                     script.append(f"xtickLabelDoc{pos_var}.font = \"{self.font_tick}\";\n")
-                    script.append(f"xtickLabelDoc{pos_var}.fillColor = {color_to_js(self.ui_color)};\n")
-                    script.append(f"xtickLabelDoc{pos_var}.justification = ParagraphJustification.CENTER_JUSTIFY;\n")
+                    xtick_fill = getattr(self, "xtick_color", None)
+                    if xtick_fill is None:
+                        xtick_fill = self.ui_color
+                    script.append(f"xtickLabelDoc{pos_var}.fillColor = {color_to_js(xtick_fill)};\n")
+                    if abs(xtick_rot) > 1:
+                        script.append(f"xtickLabelDoc{pos_var}.justification = ParagraphJustification.RIGHT_JUSTIFY;\n")
+                    else:
+                        script.append(f"xtickLabelDoc{pos_var}.justification = ParagraphJustification.CENTER_JUSTIFY;\n")
                     script.append(f"xtickLabelProp{pos_var}.setValue(xtickLabelDoc{pos_var});\n")
                     script.append(f"var xsr{pos_var} = xtickLabel{pos_var}.sourceRectAtTime(0, false);\n")
                     script.append(f"var xap{pos_var} = xtickLabel{pos_var}.property('Transform').property('Anchor Point');\n")
                     script.append(f"xap{pos_var}.setValue({anchor_js});\n")
+                    if xtick_rot:
+                        script.append(f"xtickLabel{pos_var}.property('Transform').property('Rotation').setValue({xtick_rot});\n")
                     # script.append(self._generate_text_slide_in_jsx(f"xtickLabel{pos_var}", f"XTickLabel{pos_var}", ANIM_DURATION))
                     _xtick_label_op = f"xtickLabel{pos_var}.property('Transform').property('Opacity')"
                     if self._view_animated:
@@ -7045,7 +7202,7 @@ class AEGraph:
                 if self._normalize_scale(self.yscale) == "log" and pos <= 0:
                     continue
                 if self._ytick_labels_auto:
-                    label = self._format_tick_label(pos, self.yscale)
+                    label = self._format_tick_label(pos, self.yscale, axis="y")
                 if not str(label).strip():
                     continue
                 pos_var = str(pos).replace('-', 'm').replace('.', '_')
